@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dados do Usuário</title>
+</head>
+
+<body>
+
+    <h1>Dados do Usuário</h1>
+
+    <form method="POST">
+
+        <label>Nome completo:</label><br>
+        <input type="text" name="nome" required>
+
+        <br><br>
+
+        <label>Idade:</label><br>
+        <input type="number" name="idade" required>
+
+        <br><br>
+
+        <label>Sexo:</label><br>
+        <select name="sexo" required>
+            <option value="">Selecione</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Feminino">Feminino</option>
+        </select>
+
+        <br><br>
+
+        <label>Telefone:</label><br>
+        <input type="tel" name="telefone">
+
+        <br><br>
+
+        <label>E-mail:</label><br>
+        <input type="email" name="email">
+
+        <br><br>
+
+        <label>Província:</label><br>
+        <input type="text" name="provincia">
+
+        <br><br>
+
+        <label>Cidade:</label><br>
+        <input type="text" name="cidade">
+
+        <br><br>
+
+        <button type="submit">Guardar dados</button>
+
+    </form>
+
+    <br>
+
+    <a href="/dashboard">Voltar ao Dashboard</a>
+
+</body>
+</html>

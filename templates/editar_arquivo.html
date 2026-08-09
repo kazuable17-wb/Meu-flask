@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>{{ nome }} - Meu VS Code</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1e1e1e;
+            color: #cccccc;
+            font-family: Arial, sans-serif;
+        }
+
+        /* =========================
+           BARRA SUPERIOR
+        ========================= */
+
+        .topbar {
+            height: 48px;
+            background: #181818;
+
+            display: flex;
+            align-items: center;
+
+            border-bottom: 1px solid #333;
+        }
+
+        .logo {
+            padding: 0 18px;
+
+            color: #4ec9b0;
+
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .arquivo {
+            height: 48px;
+
+            display: flex;
+            align-items: center;
+
+            padding: 0 20px;
+
+            background: #1e1e1e;
+
+            border-left: 1px solid #333;
+            border-right: 1px solid #333;
+
+            color: white;
+        }
+
+        .botoes {
+            margin-left: auto;
+
+            display: flex;
+            gap: 5px;
+
+            padding-right: 10px;
+        }
+
+        button {
+            border: none;
+
+            padding: 7px 12px;
+
+            border-radius: 4px;
+
+            background: #333;
+
+            color: white;
+
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #444;
+        }
+
+        .salvar {
+            background: #0e639c;
+        }
+
+        .salvar:hover {
+            background: #1177bb;
+        }
+
+        .excluir {
+            background: #8b1e1e;
+        }
+
+        /* =========================
+           EDITOR
+        ========================= */
+
+        #editor {
+            position: absolute;
+
+            top: 48px;
+            bottom: 25px;
+
+            left: 0;
+            right: 0;
+        }
+
+        /* =========================
+           STATUS BAR
+        ========================= */
+
+        .statusbar {
+            position: fixed;
+
+            left: 0;
+            right: 0;
+            bottom: 0;
+
+            height: 25px;
+
+            background: #007acc;
+
+            color: white;
+
+            display: flex;
+
+            align-items: center;
+
+            padding: 0 12px;
+
+            font-size: 12px;
+        }
+
+        .status-right {
+            margin-left: auto;
+        }
+
+        /* =========================
+           MENSAGEM
+        ========================= */
+
+        #mensagem {
+            position: fixed;
+
+            right: 20px;
+            bottom: 45px;
+
+            background: #252526;
+
+            color: white;
+
+            padding: 12px 20px;
+
+            border-radius: 5px;
+
+            display: none;
+
+            box-shadow: 0 4px 15px black;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+
+<!-- =========================
+     BARRA
+========================= -->
+
+<div class="topbar">
+
+    <div class="logo">
+        VS CODE
+    </div>
+
+    <div class="arquivo">
+
+        🐍 &nbsp;
+
+        <strong>
+            {{ nome }}
+        </strong>
+
+    </div>
+
+    <div class="botoes">
+
+        <button onclick="novoArquivo()">
+            + Novo
+        </button>
+
+        <button onclick="pesquisar()">
+            🔍 Pesquisar
+        </button>
+
+        <button
+            class="salvar"
+            onclick="salvar()">
+
+            💾 Salvar
+
+        </button>
+
+        <button
+            class="excluir"
+            onclick="excluirArquivo()">
+
+            🗑 Excluir
+
+        </button>
+
+        <button onclick="voltar()">
+
+            ← Voltar
+
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     EDITOR MONACO
+========================= -->
+
+<div id="editor"></div>
+
+
+<!-- =========================
+     STATUS
+========================= -->
+
+<div class="statusbar">
+
+    <span>
+        Python
+    </span>
+
+    <span class="status-right">
+
+        UTF-8 &nbsp; | &nbsp; LF
+
+    </span>
+
+</div>
+
+
+<div id="mensagem">
+    Alterações salvas
+</div>
+
+
+<!-- =========================
+     MONACO
+========================= -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
+<script>
+
+require.config({
+
+    paths: {
+
+        vs:
+        "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs"
+
+    }
+
+});
+
+
+let editor;
+
+
+require(
+
+    ["vs/editor/editor.main"],
+
+    function () {
+
+        editor = monaco.editor.create(
+
+            document.getElementById("editor"),
+
+            {
+
+                value:
+                {{ codigo | tojson }},
+
+                language: "python",
+
+                theme: "vs-dark",
+
+                automaticLayout: true,
+
+                fontSize: 15,
+
+                minimap: {
+
+                    enabled: true
+
+                },
+
+                lineNumbers: "on",
+
+                roundedSelection: false,
+
+                scrollBeyondLastLine: false,
+
+                wordWrap: "off",
+
+                tabSize: 4,
+
+                insertSpaces: true,
+
+                suggestOnTriggerCharacters: true,
+
+                quickSuggestions: true,
+
+                parameterHints: {
+
+                    enabled: true
+
+                },
+
+                folding: true,
+
+                bracketPairColorization: {
+
+                    enabled: true
+
+                }
+
+            }
+
+        );
+
+    }
+
+);
+
+
+// =========================
+// SALVAR
+// =========================
+
+function salvar() {
+
+    if (!editor) {
+        return;
+    }
+
+    const codigo = editor.getValue();
+
+    const formulario =
+        document.createElement("form");
+
+    formulario.method = "POST";
+
+    const campo =
+        document.createElement("textarea");
+
+    campo.name = "codigo";
+
+    campo.value = codigo;
+
+    formulario.appendChild(campo);
+
+    document.body.appendChild(formulario);
+
+    formulario.submit();
+
+}
+
+
+// =========================
+// CTRL + S
+// =========================
+
+document.addEventListener(
+
+    "keydown",
+
+    function(event) {
+
+        if (
+
+            (event.ctrlKey ||
+             event.metaKey)
+
+            &&
+
+            event.key.toLowerCase() === "s"
+
+        ) {
+
+            event.preventDefault();
+
+            salvar();
+
+        }
+
+    }
+
+);
+
+
+// =========================
+// PESQUISA
+// =========================
+
+function pesquisar() {
+
+    if (!editor) {
+        return;
+    }
+
+    editor.getAction(
+        "actions.find"
+    ).run();
+
+}
+
+
+// =========================
+// NOVO
+// =========================
+
+function novoArquivo() {
+
+    window.location.href =
+        "/novo-arquivo";
+
+}
+
+
+// =========================
+// EXCLUIR
+// =========================
+
+function excluirArquivo() {
+
+    const confirmar =
+        confirm(
+            "Tem certeza que deseja excluir {{ nome }}?"
+        );
+
+    if (!confirmar) {
+        return;
+    }
+
+    window.location.href =
+        "/excluir-arquivo/{{ nome }}";
+
+}
+
+
+// =========================
+// VOLTAR
+// =========================
+
+function voltar() {
+
+    window.location.href =
+        "/python-files";
+
+}
+
+</script>
+
+</body>
+</html>

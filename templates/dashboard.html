@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meu Sistema</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f4f7;
+        }
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .menu {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .menu a {
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 10px;
+            font-size: 20px;
+        }
+
+        .menu a:hover {
+            background: #1d4ed8;
+        }
+
+        .sair {
+            background: #dc2626 !important;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Meu Sistema</h1>
+    <p>Painel Principal</p>
+</header>
+
+<div class="container">
+
+    <h2>Menu</h2>
+
+    <br>
+
+    <div class="menu">
+
+        <a href="/ficheiros">
+            📁 Ficheiros
+        </a>
+
+        <a href="/upload">
+            ⬆️ Upload
+        </a>
+
+        <a href="/python-files">
+            🐍 Ficheiros Python
+        </a>
+
+        <a href="/logout" class="sair">
+            🚪 Sair
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Ficheiros Python</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f4f7;
+        }
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .arquivo {
+            background: white;
+            padding: 18px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .arquivo a {
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 18px;
+        }
+
+        .voltar {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Ficheiros Python</h1>
+</header>
+
+<div class="container">
+
+    <h2>Ficheiros disponíveis</h2>
+
+    {% if arquivos %}
+
+        {% for arquivo in arquivos %}
+
+            <div class="arquivo">
+                🐍
+                <a href="{{ url_for('ver_arquivo', nome=arquivo) }}">
+                    {{ arquivo }}
+                </a>
+            </div>
+
+        {% endfor %}
+
+    {% else %}
+
+        <p>Nenhum ficheiro Python encontrado.</p>
+
+    {% endif %}
+
+    <a href="{{ url_for('dashboard') }}" class="voltar">
+        ← Voltar ao Dashboard
+    </a>
+
+</div>
+
+</body>
+</html>
