@@ -3,8 +3,8 @@ import os
 
 app = Flask(__name__)
 
-app.secret_key = "minha_chave_secreta"
-
+ADMIN_USUARIO = os.getenv("ADMIN_USUARIO")
+ADMIN_SENHA = os.getenv("ADMIN_SENHA")
 
 # =========================
 # INÍCIO
@@ -24,23 +24,19 @@ def login():
 
     if request.method == "POST":
 
-        usuario = request.form.get("usuario")
-        senha = request.form.get("senha")
+    usuario = request.form.get("usuario")
+    senha = request.form.get("senha")
 
-        if usuario == "tech" and senha == "emildaemilda#1":
+    if usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
+        session["usuario"] = usuario
+        return redirect(url_for("dashboard"))
 
-            session["usuario"] = usuario
-
-            return redirect(url_for("dashboard"))
-
-        return render_template(
-            "login.html",
-            erro="Usuário ou senha incorretos"
-        )
+    return render_template(
+        "login.html",
+        erro="Usuário ou senha incorretos."
+    )
 
     return render_template("login.html")
-
-
 # =========================
 # DASHBOARD
 # =========================
