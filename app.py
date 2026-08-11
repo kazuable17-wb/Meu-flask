@@ -1,7 +1,5 @@
-
 import os
 import hmac
-import mimetypes
 
 from flask import (
     Flask,
@@ -11,8 +9,7 @@ from flask import (
     url_for,
     session,
     flash,
-    send_file,
-    abort,
+    send_from_directory,
 )
 
 
@@ -38,11 +35,13 @@ if not SECRET_KEY:
 app.config["SECRET_KEY"] = SECRET_KEY
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 )
+
 
 # Limite máximo de upload: 16 MB
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
@@ -74,16 +73,22 @@ if not USUARIO or not USUARIO_SENHA:
 
 
 # =========================================================
-# PASTA DE ARQUIVOS
+# PASTA DOS ARQUIVOS
 # =========================================================
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-ARQUIVOS_DIR = os.path.abspath(
-    os.path.join(BASE_DIR, "arquivos")
+BASE_DIR = os.path.abspath(
+    os.path.dirname(__file__)
 )
 
-os.makedirs(ARQUIVOS_DIR, exist_ok=True)
+ARQUIVOS_DIR = os.path.join(
+    BASE_DIR,
+    "arquivos"
+)
+
+os.makedirs(
+    ARQUIVOS_DIR,
+    exist_ok=True
+)
 
 
 # =========================================================
@@ -107,13 +112,11 @@ def adicionar_cabecalhos_seguranca(response):
 
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "img-src 'self' data: blob: https:; "
+        "img-src 'self' data: https:; "
         "style-src 'self' 'unsafe-inline' https:; "
         "script-src 'self' 'unsafe-inline' https:; "
         "font-src 'self' data: https:; "
         "connect-src 'self' https:; "
-        "media-src 'self' blob:; "
-        "frame-src 'self' blob:; "
         "frame-ancestors 'self';"
     )
 
@@ -125,17 +128,24 @@ def adicionar_cabecalhos_seguranca(response):
 # =========================================================
 
 def usuario_logado():
-    return bool(session.get("usuario"))
+
+    return bool(
+        session.get("usuario")
+    )
 
 
 def usuario_admin():
+
     return session.get("admin") is True
 
 
 def exigir_login():
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
 
     return None
 
@@ -143,58 +153,68 @@ def exigir_login():
 def exigir_admin():
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+
+        return redirect(
+            url_for("login")
+        )
 
     if not usuario_admin():
 
         flash(
             "Acesso negado. Apenas o administrador pode executar esta operação.",
-            "erro",
+            "erro"
         )
 
-        return redirect(url_for("dashboard"))
+        return redirect(
+            url_for("dashboard")
+        )
 
     return None
 
 
 # =========================================================
-# SEGURANÇA DE ARQUIVOS
+# SEGURANÇA DOS ARQUIVOS
 # =========================================================
 
 def arquivo_e_py(nome):
+
     return nome.lower().endswith(".py")
 
 
 def app_py_protegido(nome):
-    return os.path.basename(nome).lower() == "app.py"
+
+    return os.path.basename(
+        nome
+    ).lower() == "app.py"
 
 
 def caminho_seguro(nome):
-    """
-    Converte um nome relativo para caminho absoluto
-    dentro da pasta ARQUIVOS_DIR.
-
-    Impede:
-        ../
-        ../../
-        caminhos absolutos
-        acesso fora da pasta arquivos/
-    """
 
     if not nome:
+
         return None
 
-    nome = str(nome).replace("\\", "/").strip()
+    # Normalizar barras
+    nome = nome.replace("\\", "/")
+
+    # Remover espaços desnecessários
+    nome = nome.strip()
 
     if not nome:
+
         return None
 
-    # Impede caminho absoluto Linux
-    if nome.startswith("/"):
+    # Normalizar caminho
+    nome = os.path.normpath(nome)
+
+    # Impedir caminhos absolutos
+    if os.path.isabs(nome):
+
         return None
 
-    # Impede caminho absoluto Windows
-    if len(nome) >= 2 and nome[1] == ":":
+    # Impedir ../
+    if nome == ".." or nome.startswith(".." + os.sep):
+
         return None
 
     caminho = os.path.abspath(
@@ -206,21 +226,16 @@ def caminho_seguro(nome):
 
     try:
 
-        pasta_real = os.path.realpath(
-            ARQUIVOS_DIR
-        )
-
-        caminho_real = os.path.realpath(
-            caminho
-        )
-
         if os.path.commonpath(
-            [pasta_real, caminho_real]
-        ) != pasta_real:
+            [
+                ARQUIVOS_DIR,
+                caminho
+            ]
+        ) != ARQUIVOS_DIR:
 
             return None
 
-    except (ValueError, OSError):
+    except ValueError:
 
         return None
 
@@ -228,21 +243,25 @@ def caminho_seguro(nome):
 
 
 def nome_arquivo_seguro(nome):
-    """
-    Retorna somente o nome do arquivo.
-    """
 
     if not nome:
+
         return None
 
+    # Apenas o nome do arquivo
     nome = os.path.basename(
         nome
     ).strip()
 
     if not nome:
+
         return None
 
-    if nome in (".", ".."):
+    if nome in (
+        ".",
+        ".."
+    ):
+
         return None
 
     return nome
@@ -256,6 +275,7 @@ def nome_arquivo_seguro(nome):
 def index():
 
     if usuario_logado():
+
         return redirect(
             url_for("dashboard")
         )
@@ -276,6 +296,7 @@ def index():
 def login():
 
     if usuario_logado():
+
         return redirect(
             url_for("dashboard")
         )
@@ -292,16 +313,22 @@ def login():
             ""
         )
 
-        # ADMIN
+        # -------------------------------------------------
+        # ADMINISTRADOR
+        # -------------------------------------------------
 
-        admin_usuario_correto = hmac.compare_digest(
-            usuario,
-            ADMIN_USUARIO
+        admin_usuario_correto = (
+            hmac.compare_digest(
+                usuario,
+                ADMIN_USUARIO
+            )
         )
 
-        admin_senha_correta = hmac.compare_digest(
-            senha,
-            ADMIN_SENHA
+        admin_senha_correta = (
+            hmac.compare_digest(
+                senha,
+                ADMIN_SENHA
+            )
         )
 
         if (
@@ -312,23 +339,31 @@ def login():
             session.clear()
 
             session["usuario"] = ADMIN_USUARIO
+
             session["admin"] = True
+
             session["role"] = "admin"
 
             return redirect(
                 url_for("dashboard")
             )
 
+        # -------------------------------------------------
         # USUÁRIO NORMAL
+        # -------------------------------------------------
 
-        usuario_correto = hmac.compare_digest(
-            usuario,
-            USUARIO
+        usuario_correto = (
+            hmac.compare_digest(
+                usuario,
+                USUARIO
+            )
         )
 
-        senha_correta = hmac.compare_digest(
-            senha,
-            USUARIO_SENHA
+        senha_correta = (
+            hmac.compare_digest(
+                senha,
+                USUARIO_SENHA
+            )
         )
 
         if (
@@ -339,7 +374,9 @@ def login():
             session.clear()
 
             session["usuario"] = USUARIO
+
             session["admin"] = False
+
             session["role"] = "usuario"
 
             return redirect(
@@ -364,6 +401,7 @@ def login():
 def dashboard():
 
     if not usuario_logado():
+
         return redirect(
             url_for("login")
         )
@@ -371,12 +409,12 @@ def dashboard():
     return render_template(
         "dashboard.html",
         usuario=session.get("usuario"),
-        admin=usuario_admin(),
+        admin=usuario_admin()
     )
 
 
 # =========================================================
-# ADMIN
+# PAINEL ADMINISTRADOR
 # =========================================================
 
 @app.route("/admin")
@@ -385,9 +423,11 @@ def admin():
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     total_arquivos = 0
+
     total_python = 0
 
     os.makedirs(
@@ -404,18 +444,19 @@ def admin():
             total_arquivos += 1
 
             if ficheiro.lower().endswith(".py"):
+
                 total_python += 1
 
     return render_template(
         "admin.html",
         usuario=session.get("usuario"),
         total_arquivos=total_arquivos,
-        total_python=total_python,
+        total_python=total_python
     )
 
 
 # =========================================================
-# ADMIN INFO
+# PAINEL ADMINISTRATIVO
 # =========================================================
 
 @app.route("/admin-info")
@@ -424,9 +465,11 @@ def admin_info():
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     total_arquivos = 0
+
     total_python = 0
 
     os.makedirs(
@@ -443,11 +486,13 @@ def admin_info():
             total_arquivos += 1
 
             if ficheiro.lower().endswith(".py"):
+
                 total_python += 1
 
     html = f"""
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
 
 <meta charset="UTF-8">
@@ -484,6 +529,7 @@ header {{
     display: grid;
     grid-template-columns:
         repeat(auto-fit, minmax(220px, 1fr));
+
     gap: 20px;
 }}
 
@@ -492,7 +538,9 @@ header {{
     padding: 30px;
     border-radius: 12px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+
+    box-shadow:
+        0 2px 8px rgba(0,0,0,.1);
 }}
 
 .numero {{
@@ -558,6 +606,7 @@ a {{
 </div>
 
 </body>
+
 </html>
 """
 
@@ -575,6 +624,7 @@ a {{
 def dados_usuario():
 
     if not usuario_logado():
+
         return redirect(
             url_for("login")
         )
@@ -591,7 +641,9 @@ def dados_usuario():
         )
 
     return render_template(
-        "dados-usuario.html"
+        "dados-usuario.html",
+        usuario=session.get("usuario"),
+        admin=usuario_admin()
     )
 
 
@@ -603,6 +655,7 @@ def dados_usuario():
 def arquivos():
 
     if not usuario_logado():
+
         return redirect(
             url_for("login")
         )
@@ -632,6 +685,7 @@ def arquivos():
                     ARQUIVOS_DIR
                 )
 
+                # Sempre usar /
                 relativo = relativo.replace(
                     os.sep,
                     "/"
@@ -657,12 +711,12 @@ def arquivos():
     return render_template(
         "arquivos.html",
         arquivos=lista,
-        admin=usuario_admin(),
+        admin=usuario_admin()
     )
 
 
 # =========================================================
-# VISUALIZAR / ABRIR ARQUIVO
+# VISUALIZAR ARQUIVO
 # =========================================================
 
 @app.route(
@@ -671,28 +725,25 @@ def arquivos():
 def visualizar(nome):
 
     if not usuario_logado():
+
         return redirect(
             url_for("login")
         )
 
-    # -----------------------------------------------------
-    # VALIDAR CAMINHO
-    # -----------------------------------------------------
+    # Normalizar barras
+    nome = nome.replace(
+        "\\",
+        "/"
+    ).strip()
 
-    caminho = caminho_seguro(nome)
+    caminho = caminho_seguro(
+        nome
+    )
 
     if caminho is None:
 
-        abort(404)
-
-    # -----------------------------------------------------
-    # VERIFICAR SE EXISTE
-    # -----------------------------------------------------
-
-    if not os.path.exists(caminho):
-
         flash(
-            "Ficheiro não encontrado.",
+            "Caminho de ficheiro inválido.",
             "erro"
         )
 
@@ -700,14 +751,11 @@ def visualizar(nome):
             url_for("arquivos")
         )
 
-    # -----------------------------------------------------
-    # NÃO PERMITIR ABRIR DIRETÓRIO
-    # -----------------------------------------------------
-
+    # Verificar existência
     if not os.path.isfile(caminho):
 
         flash(
-            "O caminho informado não é um ficheiro.",
+            f"Ficheiro não encontrado: {nome}",
             "erro"
         )
 
@@ -715,9 +763,9 @@ def visualizar(nome):
             url_for("arquivos")
         )
 
-    # -----------------------------------------------------
-    # ARQUIVOS PYTHON
-    # -----------------------------------------------------
+    # =====================================================
+    # PYTHON
+    # =====================================================
 
     if arquivo_e_py(nome):
 
@@ -734,7 +782,7 @@ def visualizar(nome):
         except UnicodeDecodeError:
 
             flash(
-                "Não foi possível ler o ficheiro Python.",
+                "O ficheiro Python não está em UTF-8.",
                 "erro"
             )
 
@@ -758,37 +806,33 @@ def visualizar(nome):
             nome=nome,
             conteudo=conteudo,
             admin=usuario_admin(),
-            somente_visualizacao=not usuario_admin(),
+            somente_visualizacao=not usuario_admin()
         )
 
-    # -----------------------------------------------------
-    # OUTROS ARQUIVOS
-    # -----------------------------------------------------
+    # =====================================================
+    # OUTROS TIPOS DE ARQUIVO
+    # =====================================================
 
-    tipo_mime, _ = mimetypes.guess_type(
+    diretorio = os.path.dirname(
         caminho
     )
 
-    if not tipo_mime:
-        tipo_mime = "application/octet-stream"
-
-    # -----------------------------------------------------
-    # ENVIAR ARQUIVO DIRETAMENTE
-    # -----------------------------------------------------
+    nome_arquivo = os.path.basename(
+        caminho
+    )
 
     try:
 
-        return send_file(
-            caminho,
-            mimetype=tipo_mime,
-            as_attachment=False,
-            conditional=True
+        return send_from_directory(
+            diretorio,
+            nome_arquivo,
+            as_attachment=False
         )
 
-    except OSError:
+    except OSError as e:
 
         flash(
-            "Não foi possível abrir o ficheiro.",
+            f"Erro ao abrir o ficheiro: {e}",
             "erro"
         )
 
@@ -798,7 +842,7 @@ def visualizar(nome):
 
 
 # =========================================================
-# DOWNLOAD FORÇADO
+# DOWNLOAD
 # =========================================================
 
 @app.route(
@@ -807,11 +851,19 @@ def visualizar(nome):
 def download(nome):
 
     if not usuario_logado():
+
         return redirect(
             url_for("login")
         )
 
-    caminho = caminho_seguro(nome)
+    nome = nome.replace(
+        "\\",
+        "/"
+    ).strip()
+
+    caminho = caminho_seguro(
+        nome
+    )
 
     if (
         caminho is None
@@ -827,23 +879,26 @@ def download(nome):
             url_for("arquivos")
         )
 
-    nome_download = os.path.basename(
+    diretorio = os.path.dirname(
+        caminho
+    )
+
+    nome_arquivo = os.path.basename(
         caminho
     )
 
     try:
 
-        return send_file(
-            caminho,
-            as_attachment=True,
-            download_name=nome_download,
-            conditional=True
+        return send_from_directory(
+            diretorio,
+            nome_arquivo,
+            as_attachment=True
         )
 
-    except OSError:
+    except OSError as e:
 
         flash(
-            "Não foi possível fazer o download.",
+            f"Erro no download: {e}",
             "erro"
         )
 
@@ -853,7 +908,7 @@ def download(nome):
 
 
 # =========================================================
-# EDITAR PY
+# EDITAR ARQUIVO PY
 # SOMENTE ADMIN
 # =========================================================
 
@@ -866,6 +921,7 @@ def editar(nome):
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     if not arquivo_e_py(nome):
@@ -893,7 +949,9 @@ def editar(nome):
             )
         )
 
-    caminho = caminho_seguro(nome)
+    caminho = caminho_seguro(
+        nome
+    )
 
     if (
         caminho is None
@@ -958,6 +1016,7 @@ def novo_arquivo():
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     if request.method == "POST":
@@ -971,6 +1030,22 @@ def novo_arquivo():
 
             flash(
                 "Digite o nome do ficheiro.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("novo_arquivo")
+            )
+
+        # Impedir caminhos
+        nome = nome_arquivo_seguro(
+            nome
+        )
+
+        if not nome:
+
+            flash(
+                "Nome de ficheiro inválido.",
                 "erro"
             )
 
@@ -1000,7 +1075,9 @@ def novo_arquivo():
                 url_for("novo_arquivo")
             )
 
-        caminho = caminho_seguro(nome)
+        caminho = caminho_seguro(
+            nome
+        )
 
         if caminho is None:
 
@@ -1077,6 +1154,7 @@ def upload():
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     if request.method == "POST":
@@ -1124,8 +1202,7 @@ def upload():
                 url_for("upload")
             )
 
-        # SOMENTE PYTHON
-
+        # Somente Python
         if not nome.lower().endswith(".py"):
 
             flash(
@@ -1137,8 +1214,7 @@ def upload():
                 url_for("upload")
             )
 
-        # PROTEGER APP.PY
-
+        # app.py protegido
         if app_py_protegido(nome):
 
             flash(
@@ -1150,7 +1226,9 @@ def upload():
                 url_for("upload")
             )
 
-        caminho = caminho_seguro(nome)
+        caminho = caminho_seguro(
+            nome
+        )
 
         if caminho is None:
 
@@ -1163,6 +1241,7 @@ def upload():
                 url_for("upload")
             )
 
+        # Não substituir
         if os.path.exists(caminho):
 
             flash(
@@ -1186,9 +1265,29 @@ def upload():
                 caminho
             )
 
+            # Confirmar que foi realmente gravado
+            if not os.path.isfile(caminho):
+
+                flash(
+                    "O upload terminou, mas o ficheiro não foi encontrado.",
+                    "erro"
+                )
+
+                return redirect(
+                    url_for("upload")
+                )
+
             flash(
                 "Ficheiro enviado com sucesso.",
                 "sucesso"
+            )
+
+            # Depois do upload, abrir diretamente o arquivo
+            return redirect(
+                url_for(
+                    "visualizar",
+                    nome=nome
+                )
             )
 
         except OSError as e:
@@ -1198,13 +1297,17 @@ def upload():
                 "erro"
             )
 
+            return redirect(
+                url_for("upload")
+            )
+
     return render_template(
         "upload.html"
     )
 
 
 # =========================================================
-# EXCLUIR PY
+# EXCLUIR
 # SOMENTE ADMIN
 # =========================================================
 
@@ -1217,6 +1320,7 @@ def excluir(nome):
     acesso = exigir_admin()
 
     if acesso:
+
         return acesso
 
     if not arquivo_e_py(nome):
@@ -1241,7 +1345,9 @@ def excluir(nome):
             url_for("arquivos")
         )
 
-    caminho = caminho_seguro(nome)
+    caminho = caminho_seguro(
+        nome
+    )
 
     if (
         caminho is None
@@ -1259,7 +1365,9 @@ def excluir(nome):
 
     try:
 
-        os.remove(caminho)
+        os.remove(
+            caminho
+        )
 
         flash(
             "Ficheiro excluído com sucesso.",
@@ -1293,7 +1401,7 @@ def logout():
 
 
 # =========================================================
-# ERRO 413
+# ERRO DE UPLOAD GRANDE
 # =========================================================
 
 @app.errorhandler(413)
@@ -1353,7 +1461,7 @@ def erro_interno(error):
     if usuario_logado():
 
         flash(
-            "Ocorreu um erro interno ao processar o pedido.",
+            "Ocorreu um erro interno no servidor.",
             "erro"
         )
 
@@ -1384,4 +1492,3 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
-
