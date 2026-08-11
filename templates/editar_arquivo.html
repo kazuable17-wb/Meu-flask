@@ -1,11 +1,14 @@
+<html>
 <!DOCTYPE html>
 <html lang="pt">
 <head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>{{ nome }} - Meu VS Code</title>
 
@@ -31,121 +34,80 @@
         ========================= */
 
         .topbar {
-
             height: 48px;
-
             background: #181818;
-
             display: flex;
-
             align-items: center;
-
             border-bottom: 1px solid #333;
-
         }
 
         .logo {
-
             padding: 0 18px;
-
             color: #4ec9b0;
-
             font-weight: bold;
-
             font-size: 16px;
-
         }
 
         .arquivo {
-
             height: 48px;
-
             display: flex;
-
             align-items: center;
-
             padding: 0 20px;
-
             background: #1e1e1e;
-
             border-left: 1px solid #333;
-
             border-right: 1px solid #333;
-
             color: white;
+            overflow: hidden;
+        }
 
+        .arquivo strong {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .botoes {
-
             margin-left: auto;
-
             display: flex;
-
             gap: 5px;
-
             padding-right: 10px;
-
         }
 
         button {
-
             border: none;
-
             padding: 7px 12px;
-
             border-radius: 4px;
-
             background: #333;
-
             color: white;
-
             cursor: pointer;
-
         }
 
         button:hover {
-
             background: #444;
-
         }
 
         .salvar {
-
             background: #0e639c;
-
         }
 
         .salvar:hover {
-
             background: #1177bb;
-
         }
 
         .excluir {
-
             background: #8b1e1e;
-
         }
 
         .excluir:hover {
-
             background: #b91c1c;
-
         }
 
         .somente-leitura {
-
             background: #555;
-
             color: #ddd;
-
             padding: 7px 12px;
-
             border-radius: 4px;
-
             font-size: 13px;
-
         }
 
         /* =========================
@@ -153,17 +115,11 @@
         ========================= */
 
         #editor {
-
             position: absolute;
-
             top: 48px;
-
             bottom: 25px;
-
             left: 0;
-
             right: 0;
-
         }
 
         /* =========================
@@ -171,35 +127,21 @@
         ========================= */
 
         .statusbar {
-
             position: fixed;
-
             left: 0;
-
             right: 0;
-
             bottom: 0;
-
             height: 25px;
-
             background: #007acc;
-
             color: white;
-
             display: flex;
-
             align-items: center;
-
             padding: 0 12px;
-
             font-size: 12px;
-
         }
 
         .status-right {
-
             margin-left: auto;
-
         }
 
         /* =========================
@@ -207,30 +149,50 @@
         ========================= */
 
         #mensagem {
-
             position: fixed;
-
             right: 20px;
-
             bottom: 45px;
-
             background: #252526;
-
             color: white;
-
             padding: 12px 20px;
-
             border-radius: 5px;
-
             display: none;
-
             box-shadow: 0 4px 15px black;
+        }
 
+        @media (max-width: 700px) {
+
+            .logo {
+                display: none;
+            }
+
+            .arquivo {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .botoes {
+                padding-right: 5px;
+            }
+
+            .botoes button {
+                padding: 6px 8px;
+            }
+
+            .botoes button:nth-child(2) {
+                display: none;
+            }
+
+            .somente-leitura {
+                font-size: 11px;
+                padding: 6px 8px;
+            }
         }
 
     </style>
 
 </head>
+
 
 <body>
 
@@ -265,27 +227,22 @@
                 + Novo
             </button>
 
-
             <button onclick="pesquisar()">
                 🔍 Pesquisar
             </button>
 
-
             <button
                 class="salvar"
-                onclick="salvar()">
-
+                onclick="salvar()"
+            >
                 💾 Salvar
-
             </button>
-
 
             <button
                 class="excluir"
-                onclick="excluirArquivo()">
-
+                onclick="excluirArquivo()"
+            >
                 🗑 Excluir
-
             </button>
 
         {% else %}
@@ -298,9 +255,7 @@
 
 
         <button onclick="voltar()">
-
             ← Voltar
-
         </button>
 
     </div>
@@ -309,7 +264,7 @@
 
 
 <!-- =========================
-     EDITOR MONACO
+     EDITOR
 ========================= -->
 
 <div id="editor"></div>
@@ -330,9 +285,13 @@
         UTF-8 &nbsp; | &nbsp; LF
 
         {% if admin %}
+
             &nbsp; | &nbsp; 👑 Administrador
+
         {% else %}
+
             &nbsp; | &nbsp; 👤 Somente leitura
+
         {% endif %}
 
     </span>
@@ -346,7 +305,7 @@
 
 
 <!-- =========================
-     MONACO
+     MONACO EDITOR
 ========================= -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
@@ -392,9 +351,7 @@ require(
                 fontSize: 15,
 
                 minimap: {
-
                     enabled: true
-
                 },
 
                 lineNumbers: "on",
@@ -414,30 +371,17 @@ require(
                 quickSuggestions: true,
 
                 parameterHints: {
-
                     enabled: true
-
                 },
 
                 folding: true,
 
                 bracketPairColorization: {
-
                     enabled: true
-
                 },
 
-                /*
-
-                   Usuário normal:
-                   somente leitura.
-
-                   Administrador:
-                   pode editar.
-
-                */
-
-                readOnly: {{ "false" if admin else "true" }}
+                readOnly:
+                {{ "false" if admin else "true" }}
 
             }
 
@@ -467,9 +411,7 @@ function salvar() {
 
 
     if (!editor) {
-
         return;
-
     }
 
 
@@ -514,20 +456,13 @@ function salvar() {
 // =========================
 
 document.addEventListener(
-
     "keydown",
-
     function(event) {
 
         if (
-
-            (event.ctrlKey ||
-             event.metaKey)
-
+            (event.ctrlKey || event.metaKey)
             &&
-
             event.key.toLowerCase() === "s"
-
         ) {
 
             event.preventDefault();
@@ -537,22 +472,18 @@ document.addEventListener(
         }
 
     }
-
 );
 
 
 // =========================
-// PESQUISA
+// PESQUISAR
 // =========================
 
 function pesquisar() {
 
     if (!editor) {
-
         return;
-
     }
-
 
     editor.getAction(
         "actions.find"
@@ -562,7 +493,7 @@ function pesquisar() {
 
 
 // =========================
-// NOVO
+// NOVO ARQUIVO
 // SOMENTE ADMIN
 // =========================
 
@@ -610,9 +541,7 @@ function excluirArquivo() {
 
 
     if (!confirmar) {
-
         return;
-
     }
 
 
@@ -648,5 +577,7 @@ function voltar() {
 
 </script>
 
+
 </body>
 </html>
+

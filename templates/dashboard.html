@@ -1,12 +1,19 @@
+```html
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Meu Sistema</title>
 
     <style>
+
         * {
             box-sizing: border-box;
         }
@@ -36,32 +43,30 @@
 
         .usuario {
             margin-top: 15px;
-            font-size: 16px;
-            opacity: 0.9;
+            font-size: 17px;
         }
 
-        .admin-badge {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 8px 15px;
-            background: #f59e0b;
-            color: #111827;
-            border-radius: 20px;
-            font-weight: bold;
-        }
-
+        .admin-badge,
         .user-badge {
             display: inline-block;
             margin-top: 10px;
             padding: 8px 15px;
-            background: #6b7280;
-            color: white;
             border-radius: 20px;
             font-weight: bold;
         }
 
+        .admin-badge {
+            background: #f59e0b;
+            color: #111827;
+        }
+
+        .user-badge {
+            background: #6b7280;
+            color: white;
+        }
+
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 30px auto;
             padding: 20px;
         }
@@ -73,7 +78,9 @@
 
         .menu {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
             gap: 20px;
         }
 
@@ -81,15 +88,22 @@
             background: #2563eb;
             color: white;
             text-decoration: none;
-            padding: 30px 20px;
+
+            padding: 25px 20px;
+
             text-align: center;
+
             border-radius: 12px;
-            font-size: 20px;
+
+            font-size: 19px;
             font-weight: bold;
+
             transition: 0.2s;
+
             display: flex;
             align-items: center;
             justify-content: center;
+
             min-height: 90px;
         }
 
@@ -98,16 +112,28 @@
             transform: translateY(-2px);
         }
 
-        /* Área exclusiva do administrador */
-        .admin {
-            background: #7c3aed !important;
+        /* Conta */
+
+        .conta {
+            background: #0f766e !important;
         }
 
-        .admin:hover {
-            background: #6d28d9 !important;
+        .conta:hover {
+            background: #115e59 !important;
+        }
+
+        /* Ficheiros */
+
+        .ficheiros {
+            background: #2563eb !important;
+        }
+
+        .ficheiros:hover {
+            background: #1d4ed8 !important;
         }
 
         /* Upload */
+
         .upload {
             background: #059669 !important;
         }
@@ -117,6 +143,7 @@
         }
 
         /* Criar */
+
         .criar {
             background: #0891b2 !important;
         }
@@ -125,7 +152,18 @@
             background: #0e7490 !important;
         }
 
+        /* Admin */
+
+        .admin {
+            background: #7c3aed !important;
+        }
+
+        .admin:hover {
+            background: #6d28d9 !important;
+        }
+
         /* Sair */
+
         .sair {
             background: #dc2626 !important;
         }
@@ -134,18 +172,28 @@
             background: #b91c1c !important;
         }
 
-        .secao-admin {
+        .secao {
             margin-top: 40px;
+        }
+
+        .titulo {
+            background: white;
+            padding: 15px;
+
+            border-radius: 10px;
+
+            font-size: 22px;
+            font-weight: bold;
+
+            margin-bottom: 20px;
+
+            box-shadow:
+                0 2px 8px rgba(0,0,0,.08);
         }
 
         .titulo-admin {
             background: #fef3c7;
             color: #92400e;
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 22px;
-            font-weight: bold;
-            margin-bottom: 20px;
         }
 
         @media (max-width: 600px) {
@@ -174,13 +222,17 @@
 
             .menu a {
                 min-height: 80px;
-                font-size: 20px;
+                font-size: 19px;
             }
         }
+
     </style>
+
 </head>
 
+
 <body>
+
 
 <header>
 
@@ -189,19 +241,36 @@
     <p>Painel Principal</p>
 
     {% if usuario %}
+
         <div class="usuario">
-            Usuário: <strong>{{ usuario }}</strong>
+
+            👤 Usuário:
+
+            <strong>
+                {{ usuario }}
+            </strong>
+
         </div>
+
     {% endif %}
 
+
     {% if admin %}
+
         <div class="admin-badge">
+
             👑 ADMINISTRADOR
+
         </div>
+
     {% else %}
+
         <div class="user-badge">
+
             👤 USUÁRIO
+
         </div>
+
     {% endif %}
 
 </header>
@@ -209,71 +278,99 @@
 
 <div class="container">
 
-    <h2>Menu</h2>
+
+    <h2>Menu Principal</h2>
+
 
     <!-- =====================================================
-         MENU PARA TODOS OS USUÁRIOS
+         FUNÇÕES PARA TODOS
          ===================================================== -->
 
     <div class="menu">
 
-        <a href="{{ url_for('arquivos') }}">
-            📁 Ficheiros
+        <a
+            href="{{ url_for('dados_usuario') }}"
+            class="conta"
+        >
+            👤 Minha Conta
         </a>
 
-        <a href="{{ url_for('visualizar', nome='') }}"
-           style="display:none;">
+
+        <a
+            href="{{ url_for('arquivos') }}"
+            class="ficheiros"
+        >
+            📁 Ver Ficheiros
         </a>
 
     </div>
 
 
     <!-- =====================================================
-         MENU EXCLUSIVO DO ADMINISTRADOR
+         ÁREA DO ADMINISTRADOR
          ===================================================== -->
 
     {% if admin %}
 
-        <div class="secao-admin">
+        <div class="secao">
 
-            <div class="titulo-admin">
+            <div class="titulo titulo-admin">
+
                 👑 Funções do Administrador
+
             </div>
+
 
             <div class="menu">
 
-                <a href="{{ url_for('upload') }}"
-                   class="upload">
-                    ⬆️ Upload
+
+                <a
+                    href="{{ url_for('upload') }}"
+                    class="upload"
+                >
+
+                    ⬆️ Upload .py
+
                 </a>
 
 
-                <a href="{{ url_for('arquivos') }}">
-                    🐍 Ficheiros Python
-                </a>
+                <a
+                    href="{{ url_for('novo_arquivo') }}"
+                    class="criar"
+                >
 
-
-                <a href="{{ url_for('novo_arquivo') }}"
-                   class="criar">
                     ➕ Criar ficheiro .py
+
                 </a>
 
 
-                <a href="{{ url_for('arquivos') }}"
-                   class="admin">
+                <a
+                    href="{{ url_for('arquivos') }}"
+                    class="admin"
+                >
+
                     ✏️ Editar .py
+
                 </a>
 
 
-                <a href="{{ url_for('arquivos') }}"
-                   class="admin">
+                <a
+                    href="{{ url_for('arquivos') }}"
+                    class="admin"
+                >
+
                     🗑️ Excluir .py
+
                 </a>
 
 
-                <a href="/admin"
-                   class="admin">
+                <a
+                    href="{{ url_for('admin') }}"
+                    class="admin"
+                >
+
                     ⚙️ Painel de Administrador
+
                 </a>
 
             </div>
@@ -287,20 +384,27 @@
          SAIR
          ===================================================== -->
 
-    <div style="margin-top: 30px;">
+    <div class="secao">
 
         <div class="menu">
 
-            <a href="{{ url_for('logout') }}"
-               class="sair">
+            <a
+                href="{{ url_for('logout') }}"
+                class="sair"
+            >
+
                 🚪 Sair
+
             </a>
 
         </div>
 
     </div>
 
+
 </div>
+
 
 </body>
 </html>
+```
