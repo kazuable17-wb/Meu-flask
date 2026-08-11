@@ -3,7 +3,7 @@ import os
 
 app = Flask(__name__)
 
-app.secret_key = os.getenv("SECRET_KEY")
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
 
 ADMIN_USUARIO = os.getenv("ADMIN_USUARIO")
 ADMIN_SENHA = os.getenv("ADMIN_SENHA")
