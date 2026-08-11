@@ -1,62 +1,201 @@
-from flask import Flask, render_template, request, redirect, url_for, session
 import os
+import hmac
+
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    send_from_directory
+)
+
+
+# =========================================================
+# CONFIGURAÇÃO
+# =========================================================
 
 app = Flask(__name__)
 
-# =========================================================
-# CONFIGURAÇÕES
-# =========================================================
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY não foi configurada no Render.")
-
-app.config["SECRET_KEY"] = SECRET_KEY
-
-ADMIN_USUARIO = os.getenv("ADMIN_USUARIO")
-ADMIN_SENHA = os.getenv("ADMIN_SENHA")
-
-if not ADMIN_USUARIO:
-    raise RuntimeError("ADMIN_USUARIO não foi configurado no Render.")
-
-if not ADMIN_SENHA:
-    raise RuntimeError("ADMIN_SENHA não foi configurada no Render.")
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    ""
+)
 
 
 # =========================================================
-# INÍCIO
+# ADMINISTRADOR
+# =========================================================
+
+ADMIN_USUARIO = os.environ.get(
+    "ADMIN_USUARIO",
+    ""
+)
+
+ADMIN_SENHA = os.environ.get(
+    "ADMIN_SENHA",
+    ""
+)
+
+
+# =========================================================
+# PASTA DE ARQUIVOS
+# =========================================================
+
+BASE_DIR = os.path.abspath(
+    os.path.dirname(__file__)
+)
+
+ARQUIVOS_DIR = os.path.join(
+    BASE_DIR,
+    "arquivos"
+)
+
+os.makedirs(
+    ARQUIVOS_DIR,
+    exist_ok=True
+)
+
+
+# =========================================================
+# FUNÇÕES DE SEGURANÇA
+# =========================================================
+
+def usuario_logado():
+    return "usuario" in session
+
+
+def usuario_admin():
+    return session.get(
+        "admin",
+        False
+    )
+
+
+def arquivo_e_py(nome):
+    return nome.lower().endswith(
+        ".py"
+    )
+
+
+def app_py_protegido(nome):
+    return os.path.basename(
+        nome
+    ).lower() == "app.py"
+
+
+def caminho_seguro(nome):
+
+    nome = os.path.normpath(
+        nome
+    )
+
+    if nome.startswith(".."):
+        return None
+
+    if os.path.isabs(nome):
+        return None
+
+    caminho = os.path.abspath(
+        os.path.join(
+            ARQUIVOS_DIR,
+            nome
+        )
+    )
+
+    if os.path.commonpath(
+        [ARQUIVOS_DIR, caminho]
+    ) != ARQUIVOS_DIR:
+        return None
+
+    return caminho
+
+
+# =========================================================
+# PÁGINA INICIAL
 # =========================================================
 
 @app.route("/")
-def inicio():
-    return redirect(url_for("login"))
+def index():
+
+    if usuario_logado():
+        return redirect(
+            url_for("dashboard")
+        )
+
+    return redirect(
+        url_for("login")
+    )
 
 
 # =========================================================
 # LOGIN
 # =========================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if request.method == "POST":
 
-        usuario = request.form.get("usuario", "").strip()
-        senha = request.form.get("senha", "")
+        usuario = request.form.get(
+            "usuario",
+            ""
+        ).strip()
 
-        if usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
-
-            session["usuario"] = usuario
-
-            return redirect(url_for("dashboard"))
-
-        return render_template(
-            "login.html",
-            erro="Usuário ou senha inválidos."
+        senha = request.form.get(
+            "senha",
+            ""
         )
 
-    return render_template("login.html")
+        # -------------------------------------------------
+        # COMPARAÇÃO SEGURA
+        # -------------------------------------------------
+
+        usuario_correto = hmac.compare_digest(
+            usuario,
+            ADMIN_USUARIO
+        )
+
+        senha_correta = hmac.compare_digest(
+            senha,
+            ADMIN_SENHA
+        )
+
+        # -------------------------------------------------
+        # LOGIN CORRETO
+        # -------------------------------------------------
+
+        if (
+            usuario_correto
+            and senha_correta
+        ):
+
+            session.clear()
+
+            session["usuario"] = usuario
+            session["admin"] = True
+
+            return redirect(
+                url_for("dashboard")
+            )
+
+        # -------------------------------------------------
+        # LOGIN INCORRETO
+        # -------------------------------------------------
+
+        flash(
+            "Usuário ou senha incorretos.",
+            "erro"
+        )
+
+    return render_template(
+        "login.html"
+    )
 
 
 # =========================================================
@@ -66,12 +205,18 @@ def login():
 @app.route("/dashboard")
 def dashboard():
 
-    if "usuario" not in session:
-        return redirect(url_for("login"))
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
 
     return render_template(
         "dashboard.html",
-        usuario=session["usuario"]
+        usuario=session.get(
+            "usuario"
+        ),
+        admin=usuario_admin()
     )
 
 
@@ -79,263 +224,648 @@ def dashboard():
 # DADOS DO USUÁRIO
 # =========================================================
 
-@app.route("/dados-usuario", methods=["GET", "POST"])
+@app.route(
+    "/dados-usuario",
+    methods=["GET", "POST"]
+)
 def dados_usuario():
 
-    if "usuario" not in session:
-        return redirect(url_for("login"))
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
 
     if request.method == "POST":
 
-        nome = request.form.get("nome")
-        idade = request.form.get("idade")
-        sexo = request.form.get("sexo")
-        telefone = request.form.get("telefone")
-        email = request.form.get("email")
+        flash(
+            "Dados guardados com sucesso.",
+            "sucesso"
+        )
 
-        session["dados_usuario"] = {
-            "nome": nome,
-            "idade": idade,
-            "sexo": sexo,
-            "telefone": telefone,
-            "email": email
-        }
-
-        return redirect(url_for("dashboard"))
-
-    return render_template("dados_usuario.html")
-
-
-# =========================================================
-# FICHEIROS
-# =========================================================
-
-@app.route("/ficheiros")
-def ficheiros():
-
-    if "usuario" not in session:
-        return redirect(url_for("login"))
-
-    return render_template("python_files.html")
-
-
-# =========================================================
-# PYTHON FILES
-# =========================================================
-
-@app.route("/python-files")
-def python_files():
-
-    if "usuario" not in session:
-        return redirect(url_for("login"))
-
-    pasta = os.path.dirname(os.path.abspath(__file__))
-
-    arquivos = [
-        arquivo
-        for arquivo in os.listdir(pasta)
-        if arquivo.endswith(".py")
-    ]
+        return redirect(
+            url_for("dados_usuario")
+        )
 
     return render_template(
-        "python_files.html",
-        arquivos=arquivos
+        "dados-usuario.html"
     )
 
 
 # =========================================================
-# EXCLUIR ARQUIVO
+# LISTAR ARQUIVOS
 # =========================================================
 
-@app.route("/excluir-arquivo/<nome>")
-def excluir_arquivo(nome):
+@app.route("/arquivos")
+def arquivos():
 
-    if "usuario" not in session:
-        return redirect(url_for("login"))
+    if not usuario_logado():
 
-    if nome == "app.py":
-        return "O app.py não pode ser excluído.", 403
+        return redirect(
+            url_for("login")
+        )
 
-    if not nome.endswith(".py"):
-        return "Arquivo não permitido.", 403
+    lista = []
 
-    nome = os.path.basename(nome)
+    for raiz, diretorios, ficheiros in os.walk(
+        ARQUIVOS_DIR
+    ):
 
-    pasta = os.path.dirname(os.path.abspath(__file__))
-    caminho = os.path.join(pasta, nome)
+        for ficheiro in ficheiros:
 
-    if os.path.isfile(caminho):
-        os.remove(caminho)
+            caminho_completo = os.path.join(
+                raiz,
+                ficheiro
+            )
 
-    return redirect(url_for("python_files"))
+            relativo = os.path.relpath(
+                caminho_completo,
+                ARQUIVOS_DIR
+            )
+
+            lista.append(
+                relativo
+            )
+
+    lista.sort()
+
+    return render_template(
+        "arquivos.html",
+        arquivos=lista,
+        admin=usuario_admin()
+    )
 
 
 # =========================================================
-# NOVO ARQUIVO
+# VISUALIZAR ARQUIVO
 # =========================================================
 
-@app.route("/novo-arquivo", methods=["GET", "POST"])
+@app.route(
+    "/visualizar/<path:nome>"
+)
+def visualizar(nome):
+
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
+
+    caminho = caminho_seguro(
+        nome
+    )
+
+    if (
+        caminho is None
+        or not os.path.isfile(caminho)
+    ):
+
+        flash(
+            "Ficheiro não encontrado.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    # -------------------------------------------------
+    # ARQUIVOS PY
+    # -------------------------------------------------
+
+    if arquivo_e_py(nome):
+
+        try:
+
+            with open(
+                caminho,
+                "r",
+                encoding="utf-8"
+            ) as f:
+
+                conteudo = f.read()
+
+        except (
+            UnicodeDecodeError,
+            OSError
+        ):
+
+            flash(
+                "Não foi possível ler este ficheiro.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("arquivos")
+            )
+
+        return render_template(
+            "editor.html",
+            nome=nome,
+            conteudo=conteudo,
+            admin=usuario_admin(),
+            somente_visualizacao=not usuario_admin()
+        )
+
+    # -------------------------------------------------
+    # OUTROS ARQUIVOS
+    # -------------------------------------------------
+
+    return send_from_directory(
+        ARQUIVOS_DIR,
+        nome
+    )
+
+
+# =========================================================
+# EDITAR ARQUIVO PY
+# SOMENTE ADMINISTRADOR
+# =========================================================
+
+@app.route(
+    "/editar/<path:nome>",
+    methods=["POST"]
+)
+def editar(nome):
+
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not usuario_admin():
+
+        flash(
+            "Apenas o administrador pode editar ficheiros.",
+            "erro"
+        )
+
+        return redirect(
+            url_for(
+                "visualizar",
+                nome=nome
+            )
+        )
+
+    if not arquivo_e_py(nome):
+
+        flash(
+            "Somente ficheiros .py podem ser editados.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    # -------------------------------------------------
+    # APP.PY PROTEGIDO
+    # -------------------------------------------------
+
+    if app_py_protegido(nome):
+
+        flash(
+            "O ficheiro app.py está protegido.",
+            "erro"
+        )
+
+        return redirect(
+            url_for(
+                "visualizar",
+                nome=nome
+            )
+        )
+
+    caminho = caminho_seguro(
+        nome
+    )
+
+    if (
+        caminho is None
+        or not os.path.isfile(caminho)
+    ):
+
+        flash(
+            "Ficheiro não encontrado.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    conteudo = request.form.get(
+        "conteudo",
+        ""
+    )
+
+    try:
+
+        with open(
+            caminho,
+            "w",
+            encoding="utf-8"
+        ) as f:
+
+            f.write(
+                conteudo
+            )
+
+        flash(
+            "Ficheiro guardado com sucesso.",
+            "sucesso"
+        )
+
+    except OSError as e:
+
+        flash(
+            f"Erro ao guardar: {e}",
+            "erro"
+        )
+
+    return redirect(
+        url_for(
+            "visualizar",
+            nome=nome
+        )
+    )
+
+
+# =========================================================
+# CRIAR ARQUIVO PY
+# SOMENTE ADMINISTRADOR
+# =========================================================
+
+@app.route(
+    "/novo-arquivo",
+    methods=["GET", "POST"]
+)
 def novo_arquivo():
 
-    if "usuario" not in session:
-        return redirect(url_for("login"))
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not usuario_admin():
+
+        flash(
+            "Apenas o administrador pode criar ficheiros.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
 
     if request.method == "POST":
 
-        nome = request.form.get("nome", "").strip()
+        nome = request.form.get(
+            "nome",
+            ""
+        ).strip()
 
         if not nome:
-            return "Nome inválido", 400
 
-        if not nome.endswith(".py"):
-            nome += ".py"
+            flash(
+                "Digite o nome do ficheiro.",
+                "erro"
+            )
 
-        nome = os.path.basename(nome)
+            return redirect(
+                url_for("novo_arquivo")
+            )
 
-        pasta = os.path.dirname(os.path.abspath(__file__))
-        caminho = os.path.join(pasta, nome)
+        if not arquivo_e_py(nome):
+
+            flash(
+                "O ficheiro deve ter extensão .py.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("novo_arquivo")
+            )
+
+        if app_py_protegido(nome):
+
+            flash(
+                "Não é permitido criar ou substituir app.py.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("novo_arquivo")
+            )
+
+        caminho = caminho_seguro(
+            nome
+        )
+
+        if caminho is None:
+
+            flash(
+                "Nome de ficheiro inválido.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("novo_arquivo")
+            )
 
         if os.path.exists(caminho):
-            return "Esse ficheiro já existe.", 400
 
-        with open(caminho, "w", encoding="utf-8") as arquivo:
-            arquivo.write("# Novo ficheiro Python\n\n")
+            flash(
+                "Esse ficheiro já existe.",
+                "erro"
+            )
 
-        return redirect(
-            url_for("ver_arquivo", nome=nome)
-        )
+            return redirect(
+                url_for("novo_arquivo")
+            )
 
-    return """
-<!DOCTYPE html>
-<html lang="pt">
-<head>
-    <meta charset="UTF-8">
-    <title>Novo ficheiro</title>
+        try:
 
-    <style>
-        body {
-            background: #1e1e1e;
-            color: white;
-            font-family: Arial;
-            padding: 40px;
-        }
+            os.makedirs(
+                os.path.dirname(caminho),
+                exist_ok=True
+            )
 
-        input {
-            padding: 12px;
-            width: 300px;
-            background: #252526;
-            color: white;
-            border: 1px solid #555;
-        }
+            with open(
+                caminho,
+                "w",
+                encoding="utf-8"
+            ) as f:
 
-        button {
-            padding: 12px 20px;
-            background: #007acc;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-    </style>
-</head>
+                f.write("")
 
-<body>
+            flash(
+                "Ficheiro criado com sucesso.",
+                "sucesso"
+            )
 
-    <h1>🐍 Novo ficheiro Python</h1>
+            return redirect(
+                url_for(
+                    "visualizar",
+                    nome=nome
+                )
+            )
 
-    <form method="POST">
+        except OSError as e:
 
-        <input
-            type="text"
-            name="nome"
-            placeholder="exemplo.py"
-            required
-        >
-
-        <button type="submit">
-            Criar
-        </button>
-
-    </form>
-
-</body>
-</html>
-"""
-
-
-# =========================================================
-# VER / EDITAR ARQUIVO
-# =========================================================
-
-@app.route("/ver-arquivo/<nome>", methods=["GET", "POST"])
-def ver_arquivo(nome):
-
-    if "usuario" not in session:
-        return redirect(url_for("login"))
-
-    if not nome.endswith(".py"):
-        return "Arquivo não permitido", 403
-
-    nome = os.path.basename(nome)
-
-    pasta = os.path.dirname(os.path.abspath(__file__))
-    caminho = os.path.join(pasta, nome)
-
-    if not os.path.isfile(caminho):
-        return "Arquivo não encontrado", 404
-
-    if request.method == "POST":
-
-        codigo = request.form.get("codigo", "")
-
-        with open(caminho, "w", encoding="utf-8") as arquivo:
-            arquivo.write(codigo)
-
-        return redirect(
-            url_for("ver_arquivo", nome=nome)
-        )
-
-    with open(caminho, "r", encoding="utf-8") as arquivo:
-        codigo = arquivo.read()
+            flash(
+                f"Erro ao criar ficheiro: {e}",
+                "erro"
+            )
 
     return render_template(
-        "editar_arquivo.html",
-        nome=nome,
-        codigo=codigo
+        "novo-arquivo.html"
     )
 
 
 # =========================================================
-# UPLOAD
+# UPLOAD DE ARQUIVO PY
+# SOMENTE ADMINISTRADOR
 # =========================================================
 
-@app.route("/upload", methods=["GET", "POST"])
+@app.route(
+    "/upload",
+    methods=["GET", "POST"]
+)
 def upload():
 
-    if "usuario" not in session:
-        return redirect(url_for("login"))
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not usuario_admin():
+
+        flash(
+            "Apenas o administrador pode fazer upload.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
 
     if request.method == "POST":
 
-        arquivo = request.files.get("arquivo")
+        ficheiro = request.files.get(
+            "arquivo"
+        )
 
-        if arquivo and arquivo.filename:
+        # -------------------------------------------------
+        # VERIFICAR ARQUIVO
+        # -------------------------------------------------
 
-            if arquivo.filename.endswith(".py"):
+        if ficheiro is None:
 
-                nome = os.path.basename(arquivo.filename)
+            flash(
+                "Nenhum ficheiro selecionado.",
+                "erro"
+            )
 
-                pasta = os.path.dirname(os.path.abspath(__file__))
-                caminho = os.path.join(pasta, nome)
+            return redirect(
+                url_for("upload")
+            )
 
-                arquivo.save(caminho)
+        # -------------------------------------------------
+        # PEGAR NOME ORIGINAL
+        # -------------------------------------------------
 
-                return redirect(
-                    url_for("python_files")
-                )
+        nome_original = ficheiro.filename
 
-            return "Apenas ficheiros .py são permitidos.", 400
+        if not nome_original:
 
-    return render_template("upload.html")
+            flash(
+                "Nome de ficheiro inválido.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
+
+        # -------------------------------------------------
+        # PEGAR SOMENTE O NOME
+        # -------------------------------------------------
+
+        nome = os.path.basename(
+            nome_original
+        )
+
+        # -------------------------------------------------
+        # SOMENTE .PY
+        # -------------------------------------------------
+
+        if not nome.lower().endswith(
+            ".py"
+        ):
+
+            flash(
+                "Somente ficheiros .py podem ser enviados.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
+
+        # -------------------------------------------------
+        # PROTEGER APP.PY
+        # -------------------------------------------------
+
+        if nome.lower() == "app.py":
+
+            flash(
+                "O ficheiro app.py está protegido.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
+
+        # -------------------------------------------------
+        # CAMINHO SEGURO
+        # -------------------------------------------------
+
+        caminho = caminho_seguro(
+            nome
+        )
+
+        if caminho is None:
+
+            flash(
+                "Nome de ficheiro inválido.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
+
+        # -------------------------------------------------
+        # SALVAR
+        # -------------------------------------------------
+
+        try:
+
+            ficheiro.save(
+                caminho
+            )
+
+            flash(
+                "Ficheiro enviado com sucesso.",
+                "sucesso"
+            )
+
+        except OSError as e:
+
+            flash(
+                f"Erro no upload: {e}",
+                "erro"
+            )
+
+    return render_template(
+        "upload.html"
+    )
+
+
+# =========================================================
+# EXCLUIR ARQUIVO PY
+# SOMENTE ADMINISTRADOR
+# =========================================================
+
+@app.route(
+    "/excluir/<path:nome>",
+    methods=["POST"]
+)
+def excluir(nome):
+
+    if not usuario_logado():
+
+        return redirect(
+            url_for("login")
+        )
+
+    if not usuario_admin():
+
+        flash(
+            "Apenas o administrador pode excluir ficheiros.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    if not arquivo_e_py(nome):
+
+        flash(
+            "Somente ficheiros .py podem ser excluídos.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    if app_py_protegido(nome):
+
+        flash(
+            "O ficheiro app.py não pode ser excluído.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    caminho = caminho_seguro(
+        nome
+    )
+
+    if (
+        caminho is None
+        or not os.path.isfile(caminho)
+    ):
+
+        flash(
+            "Ficheiro não encontrado.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    try:
+
+        os.remove(
+            caminho
+        )
+
+        flash(
+            "Ficheiro excluído com sucesso.",
+            "sucesso"
+        )
+
+    except OSError as e:
+
+        flash(
+            f"Erro ao excluir: {e}",
+            "erro"
+        )
+
+    return redirect(
+        url_for("arquivos")
+    )
 
 
 # =========================================================
@@ -347,16 +877,23 @@ def logout():
 
     session.clear()
 
-    return redirect(url_for("login"))
+    return redirect(
+        url_for("login")
+    )
 
 
 # =========================================================
-# SERVIDOR LOCAL
+# EXECUTAR APLICAÇÃO
 # =========================================================
 
 if __name__ == "__main__":
 
-    port = int(os.environ.get("PORT", 5000))
+    port = int(
+        os.environ.get(
+            "PORT",
+            5000
+        )
+    )
 
     app.run(
         host="0.0.0.0",
