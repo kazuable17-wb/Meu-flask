@@ -24,10 +24,51 @@
             text-align: center;
         }
 
+        header h1 {
+            margin: 0 0 10px 0;
+            font-size: 42px;
+        }
+
+        header p {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .usuario {
+            margin-top: 15px;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #f59e0b;
+            color: #111827;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .user-badge {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #6b7280;
+            color: white;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
         .container {
             max-width: 900px;
             margin: 30px auto;
             padding: 20px;
+        }
+
+        .container h2 {
+            font-size: 32px;
+            margin-bottom: 25px;
         }
 
         .menu {
@@ -42,16 +83,99 @@
             text-decoration: none;
             padding: 30px 20px;
             text-align: center;
-            border-radius: 10px;
+            border-radius: 12px;
             font-size: 20px;
+            font-weight: bold;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 90px;
         }
 
         .menu a:hover {
             background: #1d4ed8;
+            transform: translateY(-2px);
         }
 
+        /* Área exclusiva do administrador */
+        .admin {
+            background: #7c3aed !important;
+        }
+
+        .admin:hover {
+            background: #6d28d9 !important;
+        }
+
+        /* Upload */
+        .upload {
+            background: #059669 !important;
+        }
+
+        .upload:hover {
+            background: #047857 !important;
+        }
+
+        /* Criar */
+        .criar {
+            background: #0891b2 !important;
+        }
+
+        .criar:hover {
+            background: #0e7490 !important;
+        }
+
+        /* Sair */
         .sair {
             background: #dc2626 !important;
+        }
+
+        .sair:hover {
+            background: #b91c1c !important;
+        }
+
+        .secao-admin {
+            margin-top: 40px;
+        }
+
+        .titulo-admin {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+
+            header h1 {
+                font-size: 34px;
+            }
+
+            header p {
+                font-size: 19px;
+            }
+
+            .container {
+                margin: 15px auto;
+                padding: 20px;
+            }
+
+            .container h2 {
+                font-size: 28px;
+            }
+
+            .menu {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .menu a {
+                min-height: 80px;
+                font-size: 20px;
+            }
         }
     </style>
 </head>
@@ -59,33 +183,120 @@
 <body>
 
 <header>
+
     <h1>Meu Sistema</h1>
+
     <p>Painel Principal</p>
+
+    {% if usuario %}
+        <div class="usuario">
+            Usuário: <strong>{{ usuario }}</strong>
+        </div>
+    {% endif %}
+
+    {% if admin %}
+        <div class="admin-badge">
+            👑 ADMINISTRADOR
+        </div>
+    {% else %}
+        <div class="user-badge">
+            👤 USUÁRIO
+        </div>
+    {% endif %}
+
 </header>
+
 
 <div class="container">
 
     <h2>Menu</h2>
 
-    <br>
+    <!-- =====================================================
+         MENU PARA TODOS OS USUÁRIOS
+         ===================================================== -->
 
     <div class="menu">
 
-        <a href="/ficheiros">
+        <a href="{{ url_for('arquivos') }}">
             📁 Ficheiros
         </a>
 
-        <a href="/upload">
-            ⬆️ Upload
+        <a href="{{ url_for('visualizar', nome='') }}"
+           style="display:none;">
         </a>
 
-        <a href="/python-files">
-            🐍 Ficheiros Python
-        </a>
+    </div>
 
-        <a href="/logout" class="sair">
-            🚪 Sair
-        </a>
+
+    <!-- =====================================================
+         MENU EXCLUSIVO DO ADMINISTRADOR
+         ===================================================== -->
+
+    {% if admin %}
+
+        <div class="secao-admin">
+
+            <div class="titulo-admin">
+                👑 Funções do Administrador
+            </div>
+
+            <div class="menu">
+
+                <a href="{{ url_for('upload') }}"
+                   class="upload">
+                    ⬆️ Upload
+                </a>
+
+
+                <a href="{{ url_for('arquivos') }}">
+                    🐍 Ficheiros Python
+                </a>
+
+
+                <a href="{{ url_for('novo_arquivo') }}"
+                   class="criar">
+                    ➕ Criar ficheiro .py
+                </a>
+
+
+                <a href="{{ url_for('arquivos') }}"
+                   class="admin">
+                    ✏️ Editar .py
+                </a>
+
+
+                <a href="{{ url_for('arquivos') }}"
+                   class="admin">
+                    🗑️ Excluir .py
+                </a>
+
+
+                <a href="/admin"
+                   class="admin">
+                    ⚙️ Painel de Administrador
+                </a>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+
+    <!-- =====================================================
+         SAIR
+         ===================================================== -->
+
+    <div style="margin-top: 30px;">
+
+        <div class="menu">
+
+            <a href="{{ url_for('logout') }}"
+               class="sair">
+                🚪 Sair
+            </a>
+
+        </div>
 
     </div>
 

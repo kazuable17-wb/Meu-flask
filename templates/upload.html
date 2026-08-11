@@ -1,94 +1,297 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Upload de Ficheiro</title>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Upload - Administrador</title>
 
     <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
+
             margin: 0;
+
             font-family: Arial, sans-serif;
+
             background: #f2f4f7;
+
         }
 
         header {
+
             background: #1f2937;
+
             color: white;
-            padding: 20px;
+
+            padding: 25px;
+
             text-align: center;
+
+        }
+
+        header h1 {
+
+            margin: 0;
+
+        }
+
+        .admin {
+
+            display: inline-block;
+
+            margin-top: 10px;
+
+            padding: 7px 15px;
+
+            background: #f59e0b;
+
+            color: #111827;
+
+            border-radius: 20px;
+
+            font-weight: bold;
+
         }
 
         .container {
+
             max-width: 600px;
+
             margin: 40px auto;
+
             background: white;
+
             padding: 30px;
-            border-radius: 10px;
+
+            border-radius: 12px;
+
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+
         }
 
-        input {
+        h2 {
+
+            margin-top: 0;
+
+        }
+
+        .informacao {
+
+            background: #eff6ff;
+
+            border-left: 4px solid #2563eb;
+
+            padding: 15px;
+
+            margin-bottom: 20px;
+
+            border-radius: 5px;
+
+        }
+
+        .campo {
+
+            margin: 20px 0;
+
+        }
+
+        label {
+
+            display: block;
+
+            font-weight: bold;
+
+            margin-bottom: 8px;
+
+        }
+
+        input[type="file"] {
+
             width: 100%;
+
             padding: 12px;
-            margin: 15px 0;
+
+            border: 1px solid #d1d5db;
+
+            border-radius: 6px;
+
+            background: #f9fafb;
+
         }
 
         button {
-            background: #2563eb;
+
+            width: 100%;
+
+            background: #059669;
+
             color: white;
+
             border: none;
-            padding: 12px 25px;
+
+            padding: 14px 25px;
+
             border-radius: 6px;
+
             cursor: pointer;
+
+            font-size: 16px;
+
+            font-weight: bold;
+
         }
 
         button:hover {
-            background: #1d4ed8;
+
+            background: #047857;
+
         }
 
         .voltar {
-            display: inline-block;
+
+            display: block;
+
             margin-top: 20px;
+
             color: #2563eb;
+
             text-decoration: none;
+
+            text-align: center;
+
         }
+
+        .voltar:hover {
+
+            text-decoration: underline;
+
+        }
+
+        .aviso {
+
+            margin-top: 20px;
+
+            padding: 12px;
+
+            background: #fef3c7;
+
+            color: #92400e;
+
+            border-radius: 6px;
+
+            font-size: 14px;
+
+        }
+
+        @media (max-width: 600px) {
+
+            .container {
+
+                margin: 20px;
+
+                padding: 20px;
+
+            }
+
+        }
+
     </style>
+
 </head>
+
 
 <body>
 
+
 <header>
-    <h1>Upload de Ficheiro</h1>
+
+    <h1>⬆️ Upload de Ficheiro</h1>
+
+    <div class="admin">
+        👑 Área do Administrador
+    </div>
+
 </header>
+
 
 <div class="container">
 
     <h2>Enviar ficheiro Python</h2>
 
-    <form method="POST" enctype="multipart/form-data">
 
-        <input
-            type="file"
-            name="arquivo"
-            accept=".py"
-            required
-        >
+    <div class="informacao">
+
+        <strong>Administrador:</strong>
+
+        Esta área permite enviar ficheiros
+        <strong>.py</strong> para o sistema.
+
+    </div>
+
+
+    <form
+        method="POST"
+        enctype="multipart/form-data"
+    >
+
+        <div class="campo">
+
+            <label for="arquivo">
+                Selecionar ficheiro Python:
+            </label>
+
+            <input
+                type="file"
+                id="arquivo"
+                name="arquivo"
+                accept=".py"
+                required
+            >
+
+        </div>
+
 
         <button type="submit">
-            Enviar Ficheiro
+
+            ⬆️ Enviar Ficheiro
+
         </button>
 
     </form>
 
-    <br>
 
-    <a href="{{ url_for('dashboard') }}" class="voltar">
+    <div class="aviso">
+
+        🔒 Somente o administrador pode fazer
+        upload de ficheiros.
+
+        <br><br>
+
+        ⚠️ O ficheiro <strong>app.py</strong>
+        permanece protegido.
+
+    </div>
+
+
+    <a
+        href="{{ url_for('dashboard') }}"
+        class="voltar"
+    >
+
         ← Voltar ao Dashboard
+
     </a>
 
 </div>
+
 
 </body>
 </html>

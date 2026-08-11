@@ -1,5 +1,6 @@
 import os
 import hmac
+import secrets
 
 from flask import (
     Flask,
@@ -9,7 +10,8 @@ from flask import (
     url_for,
     session,
     flash,
-    send_from_directory
+    send_from_directory,
+    abort,
 )
 
 
@@ -19,10 +21,11 @@ from flask import (
 
 app = Flask(__name__)
 
+
 # =========================================================
 # SEGURANÇA DA SESSÃO
 # =========================================================
-# A SECRET_KEY DEVE existir nas Environment Variables do Render.
+
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 if not SECRET_KEY:
@@ -33,36 +36,40 @@ if not SECRET_KEY:
 
 app.config["SECRET_KEY"] = SECRET_KEY
 
-# Proteções dos cookies da sessão.
-# COOKIE_SECURE=true no Render (HTTPS).
-# Para desenvolvimento local em HTTP, use COOKIE_SECURE=false.
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 )
 
-# Limite de upload para evitar ficheiros gigantes.
+# Limite máximo de upload: 16 MB
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 
 # =========================================================
-# ADMINISTRADOR
+# UTILIZADORES
+# =========================================================
+# ADMIN_USUARIO / ADMIN_SENHA = administrador
+# USUARIO / USUARIO_SENHA     = usuário normal
+#
+# Todos devem ser configurados no Render -> Environment.
 # =========================================================
 
-ADMIN_USUARIO = os.environ.get(
-    "ADMIN_USUARIO",
-    ""
-)
+ADMIN_USUARIO = os.environ.get("ADMIN_USUARIO", "")
+ADMIN_SENHA = os.environ.get("ADMIN_SENHA", "")
 
-ADMIN_SENHA = os.environ.get(
-    "ADMIN_SENHA",
-    ""
-)
+USUARIO = os.environ.get("USUARIO", "")
+USUARIO_SENHA = os.environ.get("USUARIO_SENHA", "")
 
 if not ADMIN_USUARIO or not ADMIN_SENHA:
     raise RuntimeError(
         "ADMIN_USUARIO e ADMIN_SENHA devem ser configurados "
+        "nas Environment Variables do Render."
+    )
+
+if not USUARIO or not USUARIO_SENHA:
+    raise RuntimeError(
+        "USUARIO e USUARIO_SENHA devem ser configurados "
         "nas Environment Variables do Render."
     )
 
@@ -71,19 +78,11 @@ if not ADMIN_USUARIO or not ADMIN_SENHA:
 # PASTA DE ARQUIVOS
 # =========================================================
 
-BASE_DIR = os.path.abspath(
-    os.path.dirname(__file__)
-)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-ARQUIVOS_DIR = os.path.join(
-    BASE_DIR,
-    "arquivos"
-)
+ARQUIVOS_DIR = os.path.join(BASE_DIR, "arquivos")
 
-os.makedirs(
-    ARQUIVOS_DIR,
-    exist_ok=True
-)
+os.makedirs(ARQUIVOS_DIR, exist_ok=True)
 
 
 # =========================================================
@@ -92,22 +91,14 @@ os.makedirs(
 
 @app.after_request
 def adicionar_cabecalhos_seguranca(response):
-    # Impede o navegador de interpretar tipos de ficheiro de forma diferente.
     response.headers["X-Content-Type-Options"] = "nosniff"
-
-    # Reduz o risco de ataques de clickjacking.
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-
-    # Controla informação enviada no cabeçalho Referer.
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
-    # Desativa funcionalidades do navegador que a aplicação não necessita.
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=()"
     )
 
-    # CSP moderada para não quebrar os templates existentes que possam
-    # utilizar CSS/JS inline. Pode ser endurecida depois de rever os templates.
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "img-src 'self' data: https:; "
@@ -122,37 +113,54 @@ def adicionar_cabecalhos_seguranca(response):
 
 
 # =========================================================
-# FUNÇÕES DE SEGURANÇA
+# FUNÇÕES DE AUTENTICAÇÃO E AUTORIZAÇÃO
 # =========================================================
 
 def usuario_logado():
-    return "usuario" in session
+    return bool(session.get("usuario"))
 
 
 def usuario_admin():
-    return session.get(
-        "admin",
-        False
-    )
+    return session.get("admin") is True
 
+
+def exigir_login():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+    return None
+
+
+def exigir_admin():
+    if not usuario_logado():
+        return redirect(url_for("login"))
+
+    if not usuario_admin():
+        flash(
+            "Acesso negado. Apenas o administrador pode executar esta operação.",
+            "erro",
+        )
+        return redirect(url_for("dashboard"))
+
+    return None
+
+
+# =========================================================
+# FUNÇÕES DE SEGURANÇA DE ARQUIVOS
+# =========================================================
 
 def arquivo_e_py(nome):
-    return nome.lower().endswith(
-        ".py"
-    )
+    return nome.lower().endswith(".py")
 
 
 def app_py_protegido(nome):
-    return os.path.basename(
-        nome
-    ).lower() == "app.py"
+    return os.path.basename(nome).lower() == "app.py"
 
 
 def caminho_seguro(nome):
+    if not nome:
+        return None
 
-    nome = os.path.normpath(
-        nome
-    )
+    nome = os.path.normpath(nome)
 
     if nome.startswith(".."):
         return None
@@ -161,18 +169,37 @@ def caminho_seguro(nome):
         return None
 
     caminho = os.path.abspath(
-        os.path.join(
-            ARQUIVOS_DIR,
-            nome
-        )
+        os.path.join(ARQUIVOS_DIR, nome)
     )
 
-    if os.path.commonpath(
-        [ARQUIVOS_DIR, caminho]
-    ) != ARQUIVOS_DIR:
+    try:
+        if os.path.commonpath(
+            [ARQUIVOS_DIR, caminho]
+        ) != ARQUIVOS_DIR:
+            return None
+    except ValueError:
         return None
 
     return caminho
+
+
+def nome_arquivo_seguro(nome):
+    """
+    Retorna somente o nome do arquivo.
+    Impede caminhos como ../../app.py.
+    """
+    if not nome:
+        return None
+
+    nome = os.path.basename(nome).strip()
+
+    if not nome:
+        return None
+
+    if nome in (".", ".."):
+        return None
+
+    return nome
 
 
 # =========================================================
@@ -181,83 +208,85 @@ def caminho_seguro(nome):
 
 @app.route("/")
 def index():
-
     if usuario_logado():
-        return redirect(
-            url_for("dashboard")
-        )
+        return redirect(url_for("dashboard"))
 
-    return redirect(
-        url_for("login")
-    )
+    return redirect(url_for("login"))
 
 
 # =========================================================
 # LOGIN
 # =========================================================
 
-@app.route(
-    "/login",
-    methods=["GET", "POST"]
-)
+@app.route("/login", methods=["GET", "POST"])
 def login():
+
+    if usuario_logado():
+        return redirect(url_for("dashboard"))
 
     if request.method == "POST":
 
-        usuario = request.form.get(
-            "usuario",
-            ""
-        ).strip()
+        usuario = request.form.get("usuario", "").strip()
+        senha = request.form.get("senha", "")
 
-        senha = request.form.get(
-            "senha",
-            ""
-        )
+        # ---------------------------------------------
+        # VERIFICAR ADMINISTRADOR
+        # ---------------------------------------------
 
-        # -------------------------------------------------
-        # COMPARAÇÃO SEGURA
-        # -------------------------------------------------
-
-        usuario_correto = hmac.compare_digest(
+        admin_usuario_correto = hmac.compare_digest(
             usuario,
             ADMIN_USUARIO
         )
 
-        senha_correta = hmac.compare_digest(
+        admin_senha_correta = hmac.compare_digest(
             senha,
             ADMIN_SENHA
         )
 
-        # -------------------------------------------------
-        # LOGIN CORRETO
-        # -------------------------------------------------
-
-        if (
-            usuario_correto
-            and senha_correta
-        ):
+        if admin_usuario_correto and admin_senha_correta:
 
             session.clear()
 
-            session["usuario"] = usuario
+            session["usuario"] = ADMIN_USUARIO
             session["admin"] = True
+            session["role"] = "admin"
 
-            return redirect(
-                url_for("dashboard")
-            )
+            return redirect(url_for("dashboard"))
 
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # VERIFICAR USUÁRIO NORMAL
+        # ---------------------------------------------
+
+        usuario_correto = hmac.compare_digest(
+            usuario,
+            USUARIO
+        )
+
+        senha_correta = hmac.compare_digest(
+            senha,
+            USUARIO_SENHA
+        )
+
+        if usuario_correto and senha_correta:
+
+            session.clear()
+
+            session["usuario"] = USUARIO
+            session["admin"] = False
+            session["role"] = "usuario"
+
+            return redirect(url_for("dashboard"))
+
+        # ---------------------------------------------
         # LOGIN INCORRETO
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         flash(
             "Usuário ou senha incorretos.",
             "erro"
         )
 
-    return render_template(
-        "login.html"
-    )
+    return render_template("login.html")
 
 
 # =========================================================
@@ -268,18 +297,159 @@ def login():
 def dashboard():
 
     if not usuario_logado():
-
-        return redirect(
-            url_for("login")
-        )
+        return redirect(url_for("login"))
 
     return render_template(
         "dashboard.html",
-        usuario=session.get(
-            "usuario"
-        ),
-        admin=usuario_admin()
+        usuario=session.get("usuario"),
+        admin=usuario_admin(),
     )
+
+
+# =========================================================
+# PAINEL DE ADMINISTRADOR
+# =========================================================
+
+@app.route("/admin")
+def admin():
+
+    acesso = exigir_admin()
+
+    if acesso:
+        return acesso
+
+    # Estatísticas simples do diretório
+    total_arquivos = 0
+    total_python = 0
+
+    for raiz, diretorios, ficheiros in os.walk(ARQUIVOS_DIR):
+        for ficheiro in ficheiros:
+            total_arquivos += 1
+
+            if ficheiro.lower().endswith(".py"):
+                total_python += 1
+
+    # O painel é mantido dentro do app.py para funcionar
+    # mesmo antes de existir um admin.html.
+    return render_template(
+        "admin.html",
+        usuario=session.get("usuario"),
+        total_arquivos=total_arquivos,
+        total_python=total_python,
+    )
+
+
+# =========================================================
+# PAINEL ADMINISTRATIVO DE RESERVA
+# =========================================================
+# Esta rota alternativa permite testar o painel mesmo que
+# o template admin.html ainda não tenha sido criado.
+# =========================================================
+
+@app.route("/admin-info")
+def admin_info():
+
+    acesso = exigir_admin()
+
+    if acesso:
+        return acesso
+
+    total_arquivos = 0
+    total_python = 0
+
+    for raiz, diretorios, ficheiros in os.walk(ARQUIVOS_DIR):
+        for ficheiro in ficheiros:
+            total_arquivos += 1
+
+            if ficheiro.lower().endswith(".py"):
+                total_python += 1
+
+    html = f"""
+    <!DOCTYPE html>
+    <html lang="pt">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1.0">
+        <title>Painel de Administrador</title>
+        <style>
+            body {{
+                margin: 0;
+                font-family: Arial, sans-serif;
+                background: #f2f4f7;
+            }}
+            header {{
+                background: #1f2937;
+                color: white;
+                padding: 25px;
+                text-align: center;
+            }}
+            .container {{
+                max-width: 900px;
+                margin: 30px auto;
+                padding: 20px;
+            }}
+            .cards {{
+                display: grid;
+                grid-template-columns:
+                    repeat(auto-fit, minmax(220px, 1fr));
+                gap: 20px;
+            }}
+            .card {{
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
+                box-shadow: 0 2px 8px rgba(0,0,0,.1);
+            }}
+            .numero {{
+                font-size: 40px;
+                font-weight: bold;
+                color: #2563eb;
+            }}
+            a {{
+                display: inline-block;
+                margin-top: 25px;
+                background: #2563eb;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                text-decoration: none;
+            }}
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>⚙️ Painel de Administrador</h1>
+            <p>👑 {session.get("usuario")}</p>
+        </header>
+
+        <div class="container">
+
+            <div class="cards">
+
+                <div class="card">
+                    <h2>📁 Ficheiros</h2>
+                    <div class="numero">{total_arquivos}</div>
+                </div>
+
+                <div class="card">
+                    <h2>🐍 Python</h2>
+                    <div class="numero">{total_python}</div>
+                </div>
+
+            </div>
+
+            <a href="{url_for('dashboard')}">
+                ← Voltar ao Dashboard
+            </a>
+
+        </div>
+    </body>
+    </html>
+    """
+
+    return html
 
 
 # =========================================================
@@ -293,10 +463,7 @@ def dashboard():
 def dados_usuario():
 
     if not usuario_logado():
-
-        return redirect(
-            url_for("login")
-        )
+        return redirect(url_for("login"))
 
     if request.method == "POST":
 
@@ -305,9 +472,7 @@ def dados_usuario():
             "sucesso"
         )
 
-        return redirect(
-            url_for("dados_usuario")
-        )
+        return redirect(url_for("dados_usuario"))
 
     return render_template(
         "dados-usuario.html"
@@ -322,10 +487,7 @@ def dados_usuario():
 def arquivos():
 
     if not usuario_logado():
-
-        return redirect(
-            url_for("login")
-        )
+        return redirect(url_for("login"))
 
     lista = []
 
@@ -345,16 +507,14 @@ def arquivos():
                 ARQUIVOS_DIR
             )
 
-            lista.append(
-                relativo
-            )
+            lista.append(relativo)
 
     lista.sort()
 
     return render_template(
         "arquivos.html",
         arquivos=lista,
-        admin=usuario_admin()
+        admin=usuario_admin(),
     )
 
 
@@ -362,38 +522,28 @@ def arquivos():
 # VISUALIZAR ARQUIVO
 # =========================================================
 
-@app.route(
-    "/visualizar/<path:nome>"
-)
+@app.route("/visualizar/<path:nome>")
 def visualizar(nome):
 
     if not usuario_logado():
+        return redirect(url_for("login"))
 
-        return redirect(
-            url_for("login")
-        )
-
-    caminho = caminho_seguro(
-        nome
-    )
+    caminho = caminho_seguro(nome)
 
     if (
         caminho is None
         or not os.path.isfile(caminho)
     ):
-
         flash(
             "Ficheiro não encontrado.",
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
-    # -------------------------------------------------
-    # ARQUIVOS PY
-    # -------------------------------------------------
+    # ---------------------------------------------
+    # ARQUIVOS PYTHON
+    # ---------------------------------------------
 
     if arquivo_e_py(nome):
 
@@ -426,16 +576,19 @@ def visualizar(nome):
             nome=nome,
             conteudo=conteudo,
             admin=usuario_admin(),
-            somente_visualizacao=not usuario_admin()
+            somente_visualizacao=not usuario_admin(),
         )
 
-    # -------------------------------------------------
+    # ---------------------------------------------
     # OUTROS ARQUIVOS
-    # -------------------------------------------------
+    # ---------------------------------------------
+
+    diretorio = os.path.dirname(caminho)
+    nome_arquivo = os.path.basename(caminho)
 
     return send_from_directory(
-        ARQUIVOS_DIR,
-        nome
+        diretorio,
+        nome_arquivo
     )
 
 
@@ -450,25 +603,10 @@ def visualizar(nome):
 )
 def editar(nome):
 
-    if not usuario_logado():
+    acesso = exigir_admin()
 
-        return redirect(
-            url_for("login")
-        )
-
-    if not usuario_admin():
-
-        flash(
-            "Apenas o administrador pode editar ficheiros.",
-            "erro"
-        )
-
-        return redirect(
-            url_for(
-                "visualizar",
-                nome=nome
-            )
-        )
+    if acesso:
+        return acesso
 
     if not arquivo_e_py(nome):
 
@@ -477,14 +615,9 @@ def editar(nome):
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
-    # -------------------------------------------------
-    # APP.PY PROTEGIDO
-    # -------------------------------------------------
-
+    # app.py nunca pode ser editado pela aplicação web.
     if app_py_protegido(nome):
 
         flash(
@@ -499,9 +632,7 @@ def editar(nome):
             )
         )
 
-    caminho = caminho_seguro(
-        nome
-    )
+    caminho = caminho_seguro(nome)
 
     if (
         caminho is None
@@ -513,9 +644,7 @@ def editar(nome):
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
     conteudo = request.form.get(
         "conteudo",
@@ -530,9 +659,7 @@ def editar(nome):
             encoding="utf-8"
         ) as f:
 
-            f.write(
-                conteudo
-            )
+            f.write(conteudo)
 
         flash(
             "Ficheiro guardado com sucesso.",
@@ -565,22 +692,10 @@ def editar(nome):
 )
 def novo_arquivo():
 
-    if not usuario_logado():
+    acesso = exigir_admin()
 
-        return redirect(
-            url_for("login")
-        )
-
-    if not usuario_admin():
-
-        flash(
-            "Apenas o administrador pode criar ficheiros.",
-            "erro"
-        )
-
-        return redirect(
-            url_for("arquivos")
-        )
+    if acesso:
+        return acesso
 
     if request.method == "POST":
 
@@ -622,9 +737,7 @@ def novo_arquivo():
                 url_for("novo_arquivo")
             )
 
-        caminho = caminho_seguro(
-            nome
-        )
+        caminho = caminho_seguro(nome)
 
         if caminho is None:
 
@@ -698,32 +811,16 @@ def novo_arquivo():
 )
 def upload():
 
-    if not usuario_logado():
+    acesso = exigir_admin()
 
-        return redirect(
-            url_for("login")
-        )
-
-    if not usuario_admin():
-
-        flash(
-            "Apenas o administrador pode fazer upload.",
-            "erro"
-        )
-
-        return redirect(
-            url_for("arquivos")
-        )
+    if acesso:
+        return acesso
 
     if request.method == "POST":
 
         ficheiro = request.files.get(
             "arquivo"
         )
-
-        # -------------------------------------------------
-        # VERIFICAR ARQUIVO
-        # -------------------------------------------------
 
         if ficheiro is None:
 
@@ -735,10 +832,6 @@ def upload():
             return redirect(
                 url_for("upload")
             )
-
-        # -------------------------------------------------
-        # PEGAR NOME ORIGINAL
-        # -------------------------------------------------
 
         nome_original = ficheiro.filename
 
@@ -753,21 +846,23 @@ def upload():
                 url_for("upload")
             )
 
-        # -------------------------------------------------
-        # PEGAR SOMENTE O NOME
-        # -------------------------------------------------
-
-        nome = os.path.basename(
+        nome = nome_arquivo_seguro(
             nome_original
         )
 
-        # -------------------------------------------------
-        # SOMENTE .PY
-        # -------------------------------------------------
+        if nome is None:
 
-        if not nome.lower().endswith(
-            ".py"
-        ):
+            flash(
+                "Nome de ficheiro inválido.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
+
+        # Somente Python
+        if not nome.lower().endswith(".py"):
 
             flash(
                 "Somente ficheiros .py podem ser enviados.",
@@ -778,11 +873,8 @@ def upload():
                 url_for("upload")
             )
 
-        # -------------------------------------------------
-        # PROTEGER APP.PY
-        # -------------------------------------------------
-
-        if nome.lower() == "app.py":
+        # app.py protegido
+        if app_py_protegido(nome):
 
             flash(
                 "O ficheiro app.py está protegido.",
@@ -793,13 +885,7 @@ def upload():
                 url_for("upload")
             )
 
-        # -------------------------------------------------
-        # CAMINHO SEGURO
-        # -------------------------------------------------
-
-        caminho = caminho_seguro(
-            nome
-        )
+        caminho = caminho_seguro(nome)
 
         if caminho is None:
 
@@ -812,15 +898,27 @@ def upload():
                 url_for("upload")
             )
 
-        # -------------------------------------------------
-        # SALVAR
-        # -------------------------------------------------
+        # Não substituir arquivos existentes através do upload.
+        if os.path.exists(caminho):
+
+            flash(
+                "Esse ficheiro já existe. "
+                "Use o editor para alterar o ficheiro.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("upload")
+            )
 
         try:
 
-            ficheiro.save(
-                caminho
+            os.makedirs(
+                os.path.dirname(caminho),
+                exist_ok=True
             )
+
+            ficheiro.save(caminho)
 
             flash(
                 "Ficheiro enviado com sucesso.",
@@ -850,22 +948,10 @@ def upload():
 )
 def excluir(nome):
 
-    if not usuario_logado():
+    acesso = exigir_admin()
 
-        return redirect(
-            url_for("login")
-        )
-
-    if not usuario_admin():
-
-        flash(
-            "Apenas o administrador pode excluir ficheiros.",
-            "erro"
-        )
-
-        return redirect(
-            url_for("arquivos")
-        )
+    if acesso:
+        return acesso
 
     if not arquivo_e_py(nome):
 
@@ -874,10 +960,9 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
+    # app.py nunca pode ser excluído.
     if app_py_protegido(nome):
 
         flash(
@@ -885,13 +970,9 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
-    caminho = caminho_seguro(
-        nome
-    )
+    caminho = caminho_seguro(nome)
 
     if (
         caminho is None
@@ -903,15 +984,11 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(
-            url_for("arquivos")
-        )
+        return redirect(url_for("arquivos"))
 
     try:
 
-        os.remove(
-            caminho
-        )
+        os.remove(caminho)
 
         flash(
             "Ficheiro excluído com sucesso.",
@@ -942,6 +1019,25 @@ def logout():
     return redirect(
         url_for("login")
     )
+
+
+# =========================================================
+# ERRO DE UPLOAD MUITO GRANDE
+# =========================================================
+
+@app.errorhandler(413)
+def arquivo_muito_grande(error):
+
+    flash(
+        "O ficheiro é demasiado grande. "
+        "O limite é 16 MB.",
+        "erro"
+    )
+
+    if usuario_logado():
+        return redirect(url_for("upload"))
+
+    return redirect(url_for("login"))
 
 
 # =========================================================

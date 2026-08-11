@@ -31,28 +31,37 @@
         ========================= */
 
         .topbar {
+
             height: 48px;
+
             background: #181818;
 
             display: flex;
+
             align-items: center;
 
             border-bottom: 1px solid #333;
+
         }
 
         .logo {
+
             padding: 0 18px;
 
             color: #4ec9b0;
 
             font-weight: bold;
+
             font-size: 16px;
+
         }
 
         .arquivo {
+
             height: 48px;
 
             display: flex;
+
             align-items: center;
 
             padding: 0 20px;
@@ -60,21 +69,27 @@
             background: #1e1e1e;
 
             border-left: 1px solid #333;
+
             border-right: 1px solid #333;
 
             color: white;
+
         }
 
         .botoes {
+
             margin-left: auto;
 
             display: flex;
+
             gap: 5px;
 
             padding-right: 10px;
+
         }
 
         button {
+
             border: none;
 
             padding: 7px 12px;
@@ -86,22 +101,51 @@
             color: white;
 
             cursor: pointer;
+
         }
 
         button:hover {
+
             background: #444;
+
         }
 
         .salvar {
+
             background: #0e639c;
+
         }
 
         .salvar:hover {
+
             background: #1177bb;
+
         }
 
         .excluir {
+
             background: #8b1e1e;
+
+        }
+
+        .excluir:hover {
+
+            background: #b91c1c;
+
+        }
+
+        .somente-leitura {
+
+            background: #555;
+
+            color: #ddd;
+
+            padding: 7px 12px;
+
+            border-radius: 4px;
+
+            font-size: 13px;
+
         }
 
         /* =========================
@@ -109,13 +153,17 @@
         ========================= */
 
         #editor {
+
             position: absolute;
 
             top: 48px;
+
             bottom: 25px;
 
             left: 0;
+
             right: 0;
+
         }
 
         /* =========================
@@ -123,10 +171,13 @@
         ========================= */
 
         .statusbar {
+
             position: fixed;
 
             left: 0;
+
             right: 0;
+
             bottom: 0;
 
             height: 25px;
@@ -142,10 +193,13 @@
             padding: 0 12px;
 
             font-size: 12px;
+
         }
 
         .status-right {
+
             margin-left: auto;
+
         }
 
         /* =========================
@@ -153,9 +207,11 @@
         ========================= */
 
         #mensagem {
+
             position: fixed;
 
             right: 20px;
+
             bottom: 45px;
 
             background: #252526;
@@ -169,6 +225,7 @@
             display: none;
 
             box-shadow: 0 4px 15px black;
+
         }
 
     </style>
@@ -179,7 +236,7 @@
 
 
 <!-- =========================
-     BARRA
+     BARRA SUPERIOR
 ========================= -->
 
 <div class="topbar">
@@ -187,6 +244,7 @@
     <div class="logo">
         VS CODE
     </div>
+
 
     <div class="arquivo">
 
@@ -198,31 +256,46 @@
 
     </div>
 
+
     <div class="botoes">
 
-        <button onclick="novoArquivo()">
-            + Novo
-        </button>
+        {% if admin %}
 
-        <button onclick="pesquisar()">
-            🔍 Pesquisar
-        </button>
+            <button onclick="novoArquivo()">
+                + Novo
+            </button>
 
-        <button
-            class="salvar"
-            onclick="salvar()">
 
-            💾 Salvar
+            <button onclick="pesquisar()">
+                🔍 Pesquisar
+            </button>
 
-        </button>
 
-        <button
-            class="excluir"
-            onclick="excluirArquivo()">
+            <button
+                class="salvar"
+                onclick="salvar()">
 
-            🗑 Excluir
+                💾 Salvar
 
-        </button>
+            </button>
+
+
+            <button
+                class="excluir"
+                onclick="excluirArquivo()">
+
+                🗑 Excluir
+
+            </button>
+
+        {% else %}
+
+            <span class="somente-leitura">
+                👤 Somente visualização
+            </span>
+
+        {% endif %}
+
 
         <button onclick="voltar()">
 
@@ -256,6 +329,12 @@
 
         UTF-8 &nbsp; | &nbsp; LF
 
+        {% if admin %}
+            &nbsp; | &nbsp; 👑 Administrador
+        {% else %}
+            &nbsp; | &nbsp; 👤 Somente leitura
+        {% endif %}
+
     </span>
 
 </div>
@@ -271,6 +350,7 @@
 ========================= -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+
 
 <script>
 
@@ -290,7 +370,6 @@ let editor;
 
 
 require(
-
     ["vs/editor/editor.main"],
 
     function () {
@@ -302,7 +381,7 @@ require(
             {
 
                 value:
-                {{ codigo | tojson }},
+                {{ conteudo | tojson }},
 
                 language: "python",
 
@@ -346,7 +425,19 @@ require(
 
                     enabled: true
 
-                }
+                },
+
+                /*
+
+                   Usuário normal:
+                   somente leitura.
+
+                   Administrador:
+                   pode editar.
+
+                */
+
+                readOnly: {{ "false" if admin else "true" }}
 
             }
 
@@ -359,31 +450,59 @@ require(
 
 // =========================
 // SALVAR
+// SOMENTE ADMIN
 // =========================
 
 function salvar() {
 
-    if (!editor) {
+    {% if not admin %}
+
+        alert(
+            "Apenas o administrador pode editar ficheiros."
+        );
+
         return;
+
+    {% endif %}
+
+
+    if (!editor) {
+
+        return;
+
     }
 
-    const codigo = editor.getValue();
+
+    const codigo =
+        editor.getValue();
+
 
     const formulario =
         document.createElement("form");
 
+
     formulario.method = "POST";
+
+
+    formulario.action =
+        "{{ url_for('editar', nome=nome) }}";
+
 
     const campo =
         document.createElement("textarea");
 
-    campo.name = "codigo";
+
+    campo.name = "conteudo";
+
 
     campo.value = codigo;
 
+
     formulario.appendChild(campo);
 
+
     document.body.appendChild(formulario);
+
 
     formulario.submit();
 
@@ -429,8 +548,11 @@ document.addEventListener(
 function pesquisar() {
 
     if (!editor) {
+
         return;
+
     }
+
 
     editor.getAction(
         "actions.find"
@@ -441,33 +563,74 @@ function pesquisar() {
 
 // =========================
 // NOVO
+// SOMENTE ADMIN
 // =========================
 
 function novoArquivo() {
 
+    {% if not admin %}
+
+        alert(
+            "Apenas o administrador pode criar ficheiros."
+        );
+
+        return;
+
+    {% endif %}
+
+
     window.location.href =
-        "/novo-arquivo";
+        "{{ url_for('novo_arquivo') }}";
 
 }
 
 
 // =========================
 // EXCLUIR
+// SOMENTE ADMIN
 // =========================
 
 function excluirArquivo() {
+
+    {% if not admin %}
+
+        alert(
+            "Apenas o administrador pode excluir ficheiros."
+        );
+
+        return;
+
+    {% endif %}
+
 
     const confirmar =
         confirm(
             "Tem certeza que deseja excluir {{ nome }}?"
         );
 
+
     if (!confirmar) {
+
         return;
+
     }
 
-    window.location.href =
-        "/excluir-arquivo/{{ nome }}";
+
+    const formulario =
+        document.createElement("form");
+
+
+    formulario.method = "POST";
+
+
+    formulario.action =
+        "{{ url_for('excluir', nome=nome) }}";
+
+
+    document.body.appendChild(formulario);
+
+
+    formulario.submit();
 
 }
 
@@ -479,7 +642,7 @@ function excluirArquivo() {
 function voltar() {
 
     window.location.href =
-        "/python-files";
+        "{{ url_for('arquivos') }}";
 
 }
 

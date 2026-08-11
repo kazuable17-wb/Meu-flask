@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Painel de Administrador</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f4f7;
+            color: #1f2937;
+        }
+
+        /* =========================
+           CABEÇALHO
+        ========================= */
+
+        header {
+            background: #1f2937;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 36px;
+        }
+
+        header p {
+            margin: 10px 0 0;
+            font-size: 18px;
+        }
+
+        .admin-badge {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 8px 18px;
+            background: #f59e0b;
+            color: #111827;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        /* =========================
+           CONTAINER
+        ========================= */
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        /* =========================
+           ESTATÍSTICAS
+        ========================= */
+
+        .cards {
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
+            gap: 20px;
+
+            margin-bottom: 35px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+
+            box-shadow:
+                0 2px 8px rgba(0,0,0,0.08);
+
+            text-align: center;
+        }
+
+        .card-icon {
+            font-size: 40px;
+        }
+
+        .card h2 {
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .numero {
+            font-size: 42px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+
+        /* =========================
+           TÍTULO
+        ========================= */
+
+        .titulo {
+            margin-bottom: 20px;
+        }
+
+        .titulo h2 {
+            margin-bottom: 5px;
+        }
+
+        .titulo p {
+            color: #6b7280;
+        }
+
+        /* =========================
+           MENU
+        ========================= */
+
+        .menu {
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+
+            gap: 20px;
+        }
+
+        .menu a {
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            min-height: 100px;
+
+            padding: 20px;
+
+            border-radius: 12px;
+
+            color: white;
+
+            text-decoration: none;
+
+            font-size: 20px;
+
+            font-weight: bold;
+
+            text-align: center;
+
+            transition: 0.2s;
+        }
+
+        .menu a:hover {
+            transform: translateY(-3px);
+            opacity: 0.92;
+        }
+
+        /* =========================
+           CORES
+        ========================= */
+
+        .ficheiros {
+            background: #2563eb;
+        }
+
+        .upload {
+            background: #059669;
+        }
+
+        .criar {
+            background: #0891b2;
+        }
+
+        .dashboard {
+            background: #7c3aed;
+        }
+
+        .info {
+            background: #4b5563;
+        }
+
+        .sair {
+            background: #dc2626;
+        }
+
+        /* =========================
+           ÁREA DE SEGURANÇA
+        ========================= */
+
+        .seguranca {
+            margin-top: 35px;
+
+            background: white;
+
+            border-radius: 12px;
+
+            padding: 25px;
+
+            box-shadow:
+                0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .seguranca h2 {
+            margin-top: 0;
+        }
+
+        .seguranca ul {
+            line-height: 2;
+            padding-left: 25px;
+        }
+
+        .protegido {
+            color: #059669;
+            font-weight: bold;
+        }
+
+        /* =========================
+           RODAPÉ
+        ========================= */
+
+        footer {
+            text-align: center;
+
+            padding: 30px;
+
+            color: #6b7280;
+
+            font-size: 14px;
+        }
+
+        /* =========================
+           MOBILE
+        ========================= */
+
+        @media (max-width: 600px) {
+
+            header h1 {
+                font-size: 30px;
+            }
+
+            .container {
+                margin: 15px auto;
+                padding: 15px;
+            }
+
+            .menu {
+                grid-template-columns: 1fr;
+            }
+
+            .menu a {
+                min-height: 80px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+<body>
+
+
+<!-- =====================================================
+     CABEÇALHO
+===================================================== -->
+
+<header>
+
+    <h1>
+        ⚙️ Painel de Administrador
+    </h1>
+
+    <p>
+        Gestão do sistema
+    </p>
+
+    <div class="admin-badge">
+
+        👑 Administrador:
+        {{ usuario }}
+
+    </div>
+
+</header>
+
+
+<!-- =====================================================
+     CONTEÚDO
+===================================================== -->
+
+<div class="container">
+
+
+    <!-- =================================================
+         ESTATÍSTICAS
+    ================================================== -->
+
+    <div class="cards">
+
+
+        <!-- TOTAL DE FICHEIROS -->
+
+        <div class="card">
+
+            <div class="card-icon">
+                📁
+            </div>
+
+            <h2>
+                Total de Ficheiros
+            </h2>
+
+            <div class="numero">
+                {{ total_arquivos }}
+            </div>
+
+        </div>
+
+
+        <!-- TOTAL PYTHON -->
+
+        <div class="card">
+
+            <div class="card-icon">
+                🐍
+            </div>
+
+            <h2>
+                Ficheiros Python
+            </h2>
+
+            <div class="numero">
+                {{ total_python }}
+            </div>
+
+        </div>
+
+
+        <!-- ADMIN -->
+
+        <div class="card">
+
+            <div class="card-icon">
+                👑
+            </div>
+
+            <h2>
+                Nível de acesso
+            </h2>
+
+            <div
+                class="numero"
+                style="font-size: 28px;"
+            >
+                ADMIN
+            </div>
+
+        </div>
+
+
+    </div>
+
+
+    <!-- =================================================
+         MENU ADMINISTRATIVO
+    ================================================== -->
+
+    <div class="titulo">
+
+        <h2>
+            Ferramentas do Administrador
+        </h2>
+
+        <p>
+            Todas as funções administrativas do sistema.
+        </p>
+
+    </div>
+
+
+    <div class="menu">
+
+
+        <!-- FICHEIROS -->
+
+        <a
+            href="{{ url_for('arquivos') }}"
+            class="ficheiros"
+        >
+
+            📁 Ficheiros
+
+        </a>
+
+
+        <!-- UPLOAD -->
+
+        <a
+            href="{{ url_for('upload') }}"
+            class="upload"
+        >
+
+            ⬆️ Upload
+
+        </a>
+
+
+        <!-- CRIAR -->
+
+        <a
+            href="{{ url_for('novo_arquivo') }}"
+            class="criar"
+        >
+
+            ➕ Criar ficheiro .py
+
+        </a>
+
+
+        <!-- DASHBOARD -->
+
+        <a
+            href="{{ url_for('dashboard') }}"
+            class="dashboard"
+        >
+
+            🏠 Dashboard
+
+        </a>
+
+
+        <!-- INFORMAÇÕES -->
+
+        <a
+            href="{{ url_for('admin_info') }}"
+            class="info"
+        >
+
+            📊 Informações
+
+        </a>
+
+
+        <!-- SAIR -->
+
+        <a
+            href="{{ url_for('logout') }}"
+            class="sair"
+        >
+
+            🚪 Sair
+
+        </a>
+
+
+    </div>
+
+
+    <!-- =================================================
+         SEGURANÇA
+    ================================================== -->
+
+    <div class="seguranca">
+
+        <h2>
+            🔒 Segurança do Sistema
+        </h2>
+
+        <ul>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                Somente o administrador pode fazer upload.
+            </li>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                Somente o administrador pode criar ficheiros
+                Python.
+            </li>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                Somente o administrador pode editar ficheiros
+                Python.
+            </li>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                Somente o administrador pode excluir ficheiros
+                Python.
+            </li>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                O ficheiro
+                <strong>app.py</strong>
+                está protegido.
+            </li>
+
+            <li>
+                <span class="protegido">
+                    ✓
+                </span>
+
+                Usuários normais possuem acesso somente para
+                visualização.
+            </li>
+
+        </ul>
+
+    </div>
+
+
+</div>
+
+
+<!-- =====================================================
+     RODAPÉ
+===================================================== -->
+
+<footer>
+
+    Meu Sistema —
+    Painel Administrativo
+
+</footer>
+
+
+</body>
+</html>
