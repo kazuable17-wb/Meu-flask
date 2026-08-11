@@ -3,33 +3,49 @@ import os
 
 app = Flask(__name__)
 
-app.config['SECRET_KEY'] = os.getenv("SECRET_KEY")
+# =========================================================
+# CONFIGURAÇÕES
+# =========================================================
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY não foi configurada no Render.")
+
+app.config["SECRET_KEY"] = SECRET_KEY
 
 ADMIN_USUARIO = os.getenv("ADMIN_USUARIO")
 ADMIN_SENHA = os.getenv("ADMIN_SENHA")
 
-# =========================
+if not ADMIN_USUARIO:
+    raise RuntimeError("ADMIN_USUARIO não foi configurado no Render.")
+
+if not ADMIN_SENHA:
+    raise RuntimeError("ADMIN_SENHA não foi configurada no Render.")
+
+
+# =========================================================
 # INÍCIO
-# =========================
+# =========================================================
 
 @app.route("/")
 def inicio():
     return redirect(url_for("login"))
 
 
-# =========================
+# =========================================================
 # LOGIN
-# =========================
+# =========================================================
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
     if request.method == "POST":
 
-        usuario = request.form.get("usuario")
-        senha = request.form.get("senha")
+        usuario = request.form.get("usuario", "").strip()
+        senha = request.form.get("senha", "")
 
-        if  usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
+        if usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
 
             session["usuario"] = usuario
 
@@ -41,9 +57,11 @@ def login():
         )
 
     return render_template("login.html")
-# =========================
+
+
+# =========================================================
 # DASHBOARD
-# =========================
+# =========================================================
 
 @app.route("/dashboard")
 def dashboard():
@@ -57,9 +75,9 @@ def dashboard():
     )
 
 
-# =========================
+# =========================================================
 # DADOS DO USUÁRIO
-# =========================
+# =========================================================
 
 @app.route("/dados-usuario", methods=["GET", "POST"])
 def dados_usuario():
@@ -88,9 +106,9 @@ def dados_usuario():
     return render_template("dados_usuario.html")
 
 
-# =========================
+# =========================================================
 # FICHEIROS
-# =========================
+# =========================================================
 
 @app.route("/ficheiros")
 def ficheiros():
@@ -101,9 +119,9 @@ def ficheiros():
     return render_template("python_files.html")
 
 
-# =========================
+# =========================================================
 # PYTHON FILES
-# =========================
+# =========================================================
 
 @app.route("/python-files")
 def python_files():
@@ -125,9 +143,9 @@ def python_files():
     )
 
 
-# =========================
+# =========================================================
 # EXCLUIR ARQUIVO
-# =========================
+# =========================================================
 
 @app.route("/excluir-arquivo/<nome>")
 def excluir_arquivo(nome):
@@ -135,7 +153,6 @@ def excluir_arquivo(nome):
     if "usuario" not in session:
         return redirect(url_for("login"))
 
-    # Não permitir apagar o próprio sistema
     if nome == "app.py":
         return "O app.py não pode ser excluído.", 403
 
@@ -153,9 +170,9 @@ def excluir_arquivo(nome):
     return redirect(url_for("python_files"))
 
 
-# =========================
+# =========================================================
 # NOVO ARQUIVO
-# =========================
+# =========================================================
 
 @app.route("/novo-arquivo", methods=["GET", "POST"])
 def novo_arquivo():
@@ -173,7 +190,6 @@ def novo_arquivo():
         if not nome.endswith(".py"):
             nome += ".py"
 
-        # Evitar nomes perigosos
         nome = os.path.basename(nome)
 
         pasta = os.path.dirname(os.path.abspath(__file__))
@@ -246,9 +262,9 @@ def novo_arquivo():
 """
 
 
-# =========================
+# =========================================================
 # VER / EDITAR ARQUIVO
-# =========================
+# =========================================================
 
 @app.route("/ver-arquivo/<nome>", methods=["GET", "POST"])
 def ver_arquivo(nome):
@@ -288,9 +304,9 @@ def ver_arquivo(nome):
     )
 
 
-# =========================
+# =========================================================
 # UPLOAD
-# =========================
+# =========================================================
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
@@ -317,14 +333,14 @@ def upload():
                     url_for("python_files")
                 )
 
-            return "Apenas ficheiros .py são permitidos."
+            return "Apenas ficheiros .py são permitidos.", 400
 
     return render_template("upload.html")
 
 
-# =========================
+# =========================================================
 # LOGOUT
-# =========================
+# =========================================================
 
 @app.route("/logout")
 def logout():
@@ -334,9 +350,16 @@ def logout():
     return redirect(url_for("login"))
 
 
-# =========================
-# INICIAR SERVIDOR
-# =========================
+# =========================================================
+# SERVIDOR LOCAL
+# =========================================================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+
+    port = int(os.environ.get("PORT", 5000))
+
+    app.run(
+        host="0.0.0.0",
+        port=port,
+        debug=False
+    )
