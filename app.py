@@ -14,13 +14,11 @@ from flask import (
     abort,
 )
 
-
 # =========================================================
 # CONFIGURAÇÃO
 # =========================================================
 
 app = Flask(__name__)
-
 
 # =========================================================
 # SEGURANÇA DA SESSÃO
@@ -45,14 +43,8 @@ app.config["SESSION_COOKIE_SECURE"] = (
 # Limite máximo de upload: 16 MB
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
-
 # =========================================================
 # UTILIZADORES
-# =========================================================
-# ADMIN_USUARIO / ADMIN_SENHA = administrador
-# USUARIO / USUARIO_SENHA     = usuário normal
-#
-# Todos devem ser configurados no Render -> Environment.
 # =========================================================
 
 ADMIN_USUARIO = os.environ.get("ADMIN_USUARIO", "")
@@ -73,7 +65,6 @@ if not USUARIO or not USUARIO_SENHA:
         "nas Environment Variables do Render."
     )
 
-
 # =========================================================
 # PASTA DE ARQUIVOS
 # =========================================================
@@ -84,16 +75,20 @@ ARQUIVOS_DIR = os.path.join(BASE_DIR, "arquivos")
 
 os.makedirs(ARQUIVOS_DIR, exist_ok=True)
 
-
 # =========================================================
 # CABEÇALHOS DE SEGURANÇA
 # =========================================================
 
 @app.after_request
 def adicionar_cabecalhos_seguranca(response):
+
     response.headers["X-Content-Type-Options"] = "nosniff"
+
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    response.headers["Referrer-Policy"] = (
+        "strict-origin-when-cross-origin"
+    )
 
     response.headers["Permissions-Policy"] = (
         "camera=(), microphone=(), geolocation=()"
@@ -125,20 +120,25 @@ def usuario_admin():
 
 
 def exigir_login():
+
     if not usuario_logado():
         return redirect(url_for("login"))
+
     return None
 
 
 def exigir_admin():
+
     if not usuario_logado():
         return redirect(url_for("login"))
 
     if not usuario_admin():
+
         flash(
             "Acesso negado. Apenas o administrador pode executar esta operação.",
             "erro",
         )
+
         return redirect(url_for("dashboard"))
 
     return None
@@ -149,14 +149,17 @@ def exigir_admin():
 # =========================================================
 
 def arquivo_e_py(nome):
+
     return nome.lower().endswith(".py")
 
 
 def app_py_protegido(nome):
+
     return os.path.basename(nome).lower() == "app.py"
 
 
 def caminho_seguro(nome):
+
     if not nome:
         return None
 
@@ -173,11 +176,15 @@ def caminho_seguro(nome):
     )
 
     try:
+
         if os.path.commonpath(
             [ARQUIVOS_DIR, caminho]
         ) != ARQUIVOS_DIR:
+
             return None
+
     except ValueError:
+
         return None
 
     return caminho
@@ -188,6 +195,7 @@ def nome_arquivo_seguro(nome):
     Retorna somente o nome do arquivo.
     Impede caminhos como ../../app.py.
     """
+
     if not nome:
         return None
 
@@ -208,6 +216,7 @@ def nome_arquivo_seguro(nome):
 
 @app.route("/")
 def index():
+
     if usuario_logado():
         return redirect(url_for("dashboard"))
 
@@ -226,8 +235,15 @@ def login():
 
     if request.method == "POST":
 
-        usuario = request.form.get("usuario", "").strip()
-        senha = request.form.get("senha", "")
+        usuario = request.form.get(
+            "usuario",
+            ""
+        ).strip()
+
+        senha = request.form.get(
+            "senha",
+            ""
+        )
 
         # ---------------------------------------------
         # VERIFICAR ADMINISTRADOR
@@ -243,7 +259,10 @@ def login():
             ADMIN_SENHA
         )
 
-        if admin_usuario_correto and admin_senha_correta:
+        if (
+            admin_usuario_correto
+            and admin_senha_correta
+        ):
 
             session.clear()
 
@@ -251,7 +270,9 @@ def login():
             session["admin"] = True
             session["role"] = "admin"
 
-            return redirect(url_for("dashboard"))
+            return redirect(
+                url_for("dashboard")
+            )
 
         # ---------------------------------------------
         # VERIFICAR USUÁRIO NORMAL
@@ -267,7 +288,10 @@ def login():
             USUARIO_SENHA
         )
 
-        if usuario_correto and senha_correta:
+        if (
+            usuario_correto
+            and senha_correta
+        ):
 
             session.clear()
 
@@ -275,7 +299,9 @@ def login():
             session["admin"] = False
             session["role"] = "usuario"
 
-            return redirect(url_for("dashboard"))
+            return redirect(
+                url_for("dashboard")
+            )
 
         # ---------------------------------------------
         # LOGIN INCORRETO
@@ -318,19 +344,26 @@ def admin():
     if acesso:
         return acesso
 
-    # Estatísticas simples do diretório
     total_arquivos = 0
     total_python = 0
 
-    for raiz, diretorios, ficheiros in os.walk(ARQUIVOS_DIR):
+    # Garante que a pasta exista
+    os.makedirs(
+        ARQUIVOS_DIR,
+        exist_ok=True
+    )
+
+    for raiz, diretorios, ficheiros in os.walk(
+        ARQUIVOS_DIR
+    ):
+
         for ficheiro in ficheiros:
+
             total_arquivos += 1
 
             if ficheiro.lower().endswith(".py"):
                 total_python += 1
 
-    # O painel é mantido dentro do app.py para funcionar
-    # mesmo antes de existir um admin.html.
     return render_template(
         "admin.html",
         usuario=session.get("usuario"),
@@ -341,9 +374,6 @@ def admin():
 
 # =========================================================
 # PAINEL ADMINISTRATIVO DE RESERVA
-# =========================================================
-# Esta rota alternativa permite testar o painel mesmo que
-# o template admin.html ainda não tenha sido criado.
 # =========================================================
 
 @app.route("/admin-info")
@@ -357,97 +387,137 @@ def admin_info():
     total_arquivos = 0
     total_python = 0
 
-    for raiz, diretorios, ficheiros in os.walk(ARQUIVOS_DIR):
+    os.makedirs(
+        ARQUIVOS_DIR,
+        exist_ok=True
+    )
+
+    for raiz, diretorios, ficheiros in os.walk(
+        ARQUIVOS_DIR
+    ):
+
         for ficheiro in ficheiros:
+
             total_arquivos += 1
 
             if ficheiro.lower().endswith(".py"):
                 total_python += 1
 
     html = f"""
-    <!DOCTYPE html>
-    <html lang="pt">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport"
-              content="width=device-width, initial-scale=1.0">
-        <title>Painel de Administrador</title>
-        <style>
-            body {{
-                margin: 0;
-                font-family: Arial, sans-serif;
-                background: #f2f4f7;
-            }}
-            header {{
-                background: #1f2937;
-                color: white;
-                padding: 25px;
-                text-align: center;
-            }}
-            .container {{
-                max-width: 900px;
-                margin: 30px auto;
-                padding: 20px;
-            }}
-            .cards {{
-                display: grid;
-                grid-template-columns:
-                    repeat(auto-fit, minmax(220px, 1fr));
-                gap: 20px;
-            }}
-            .card {{
-                background: white;
-                padding: 30px;
-                border-radius: 12px;
-                text-align: center;
-                box-shadow: 0 2px 8px rgba(0,0,0,.1);
-            }}
-            .numero {{
-                font-size: 40px;
-                font-weight: bold;
-                color: #2563eb;
-            }}
-            a {{
-                display: inline-block;
-                margin-top: 25px;
-                background: #2563eb;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 6px;
-                text-decoration: none;
-            }}
-        </style>
-    </head>
-    <body>
-        <header>
-            <h1>⚙️ Painel de Administrador</h1>
-            <p>👑 {session.get("usuario")}</p>
-        </header>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
 
-        <div class="container">
+    <meta charset="UTF-8">
 
-            <div class="cards">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-                <div class="card">
-                    <h2>📁 Ficheiros</h2>
-                    <div class="numero">{total_arquivos}</div>
-                </div>
+    <title>Painel de Administrador</title>
 
-                <div class="card">
-                    <h2>🐍 Python</h2>
-                    <div class="numero">{total_python}</div>
+    <style>
+
+        body {{
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f4f7;
+        }}
+
+        header {{
+            background: #1f2937;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }}
+
+        .container {{
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }}
+
+        .cards {{
+            display: grid;
+            grid-template-columns:
+                repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }}
+
+        .card {{
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,.1);
+        }}
+
+        .numero {{
+            font-size: 40px;
+            font-weight: bold;
+            color: #2563eb;
+        }}
+
+        a {{
+            display: inline-block;
+            margin-top: 25px;
+            background: #2563eb;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+        }}
+
+    </style>
+
+</head>
+
+<body>
+
+    <header>
+
+        <h1>⚙️ Painel de Administrador</h1>
+
+        <p>👑 {session.get("usuario")}</p>
+
+    </header>
+
+    <div class="container">
+
+        <div class="cards">
+
+            <div class="card">
+
+                <h2>📁 Ficheiros</h2>
+
+                <div class="numero">
+                    {total_arquivos}
                 </div>
 
             </div>
 
-            <a href="{url_for('dashboard')}">
-                ← Voltar ao Dashboard
-            </a>
+            <div class="card">
+
+                <h2>🐍 Python</h2>
+
+                <div class="numero">
+                    {total_python}
+                </div>
+
+            </div>
 
         </div>
-    </body>
-    </html>
-    """
+
+        <a href="{url_for('dashboard')}">
+            ← Voltar ao Dashboard
+        </a>
+
+    </div>
+
+</body>
+</html>
+"""
 
     return html
 
@@ -472,7 +542,9 @@ def dados_usuario():
             "sucesso"
         )
 
-        return redirect(url_for("dados_usuario"))
+        return redirect(
+            url_for("dados_usuario")
+        )
 
     return render_template(
         "dados-usuario.html"
@@ -489,27 +561,53 @@ def arquivos():
     if not usuario_logado():
         return redirect(url_for("login"))
 
+    # Garante que a pasta exista
+    os.makedirs(
+        ARQUIVOS_DIR,
+        exist_ok=True
+    )
+
     lista = []
 
-    for raiz, diretorios, ficheiros in os.walk(
-        ARQUIVOS_DIR
-    ):
+    try:
 
-        for ficheiro in ficheiros:
+        for raiz, diretorios, ficheiros in os.walk(
+            ARQUIVOS_DIR
+        ):
 
-            caminho_completo = os.path.join(
-                raiz,
-                ficheiro
-            )
+            for ficheiro in ficheiros:
 
-            relativo = os.path.relpath(
-                caminho_completo,
-                ARQUIVOS_DIR
-            )
+                caminho_completo = os.path.join(
+                    raiz,
+                    ficheiro
+                )
 
-            lista.append(relativo)
+                relativo = os.path.relpath(
+                    caminho_completo,
+                    ARQUIVOS_DIR
+                )
 
-    lista.sort()
+                # Normaliza para funcionar corretamente
+                # também em links HTML.
+                relativo = relativo.replace(
+                    os.sep,
+                    "/"
+                )
+
+                lista.append(relativo)
+
+    except OSError as e:
+
+        flash(
+            f"Erro ao listar os ficheiros: {e}",
+            "erro"
+        )
+
+        lista = []
+
+    lista.sort(
+        key=lambda x: x.lower()
+    )
 
     return render_template(
         "arquivos.html",
@@ -521,6 +619,15 @@ def arquivos():
 # =========================================================
 # VISUALIZAR ARQUIVO
 # =========================================================
+
+# IMPORTANTE:
+# Aqui estava um dos erros do seu código.
+#
+# ERRADO:
+# /visualizar/path\:nome
+#
+# CORRETO:
+# /visualizar/<path:nome>
 
 @app.route("/visualizar/<path:nome>")
 def visualizar(nome):
@@ -534,12 +641,15 @@ def visualizar(nome):
         caminho is None
         or not os.path.isfile(caminho)
     ):
+
         flash(
             "Ficheiro não encontrado.",
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
     # ---------------------------------------------
     # ARQUIVOS PYTHON
@@ -584,6 +694,7 @@ def visualizar(nome):
     # ---------------------------------------------
 
     diretorio = os.path.dirname(caminho)
+
     nome_arquivo = os.path.basename(caminho)
 
     return send_from_directory(
@@ -615,9 +726,11 @@ def editar(nome):
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
-    # app.py nunca pode ser editado pela aplicação web.
+    # app.py nunca pode ser editado.
     if app_py_protegido(nome):
 
         flash(
@@ -644,7 +757,9 @@ def editar(nome):
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
     conteudo = request.form.get(
         "conteudo",
@@ -898,7 +1013,7 @@ def upload():
                 url_for("upload")
             )
 
-        # Não substituir arquivos existentes através do upload.
+        # Não substituir arquivos existentes.
         if os.path.exists(caminho):
 
             flash(
@@ -960,7 +1075,9 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
     # app.py nunca pode ser excluído.
     if app_py_protegido(nome):
@@ -970,7 +1087,9 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
     caminho = caminho_seguro(nome)
 
@@ -984,7 +1103,9 @@ def excluir(nome):
             "erro"
         )
 
-        return redirect(url_for("arquivos"))
+        return redirect(
+            url_for("arquivos")
+        )
 
     try:
 
@@ -1035,9 +1156,36 @@ def arquivo_muito_grande(error):
     )
 
     if usuario_logado():
-        return redirect(url_for("upload"))
+        return redirect(
+            url_for("upload")
+        )
 
-    return redirect(url_for("login"))
+    return redirect(
+        url_for("login")
+    )
+
+
+# =========================================================
+# ERRO 404
+# =========================================================
+
+@app.errorhandler(404)
+def pagina_nao_encontrada(error):
+
+    if usuario_logado():
+
+        flash(
+            "Página ou ficheiro não encontrado.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("dashboard")
+        )
+
+    return redirect(
+        url_for("login")
+    )
 
 
 # =========================================================
