@@ -1,6 +1,7 @@
+
 import os
 import hmac
-import secrets
+import mimetypes
 
 from flask import (
     Flask,
@@ -10,15 +11,17 @@ from flask import (
     url_for,
     session,
     flash,
-    send_from_directory,
+    send_file,
     abort,
 )
+
 
 # =========================================================
 # CONFIGURAÇÃO
 # =========================================================
 
 app = Flask(__name__)
+
 
 # =========================================================
 # SEGURANÇA DA SESSÃO
@@ -36,12 +39,14 @@ app.config["SECRET_KEY"] = SECRET_KEY
 
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 app.config["SESSION_COOKIE_SECURE"] = (
     os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 )
 
 # Limite máximo de upload: 16 MB
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+
 
 # =========================================================
 # UTILIZADORES
@@ -53,11 +58,13 @@ ADMIN_SENHA = os.environ.get("ADMIN_SENHA", "")
 USUARIO = os.environ.get("USUARIO", "")
 USUARIO_SENHA = os.environ.get("USUARIO_SENHA", "")
 
+
 if not ADMIN_USUARIO or not ADMIN_SENHA:
     raise RuntimeError(
         "ADMIN_USUARIO e ADMIN_SENHA devem ser configurados "
         "nas Environment Variables do Render."
     )
+
 
 if not USUARIO or not USUARIO_SENHA:
     raise RuntimeError(
@@ -65,15 +72,19 @@ if not USUARIO or not USUARIO_SENHA:
         "nas Environment Variables do Render."
     )
 
+
 # =========================================================
 # PASTA DE ARQUIVOS
 # =========================================================
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-ARQUIVOS_DIR = os.path.join(BASE_DIR, "arquivos")
+ARQUIVOS_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "arquivos")
+)
 
 os.makedirs(ARQUIVOS_DIR, exist_ok=True)
+
 
 # =========================================================
 # CABEÇALHOS DE SEGURANÇA
@@ -96,11 +107,13 @@ def adicionar_cabecalhos_seguranca(response):
 
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "img-src 'self' data: https:; "
+        "img-src 'self' data: blob: https:; "
         "style-src 'self' 'unsafe-inline' https:; "
         "script-src 'self' 'unsafe-inline' https:; "
         "font-src 'self' data: https:; "
         "connect-src 'self' https:; "
+        "media-src 'self' blob:; "
+        "frame-src 'self' blob:; "
         "frame-ancestors 'self';"
     )
 
@@ -108,7 +121,7 @@ def adicionar_cabecalhos_seguranca(response):
 
 
 # =========================================================
-# FUNÇÕES DE AUTENTICAÇÃO E AUTORIZAÇÃO
+# AUTENTICAÇÃO
 # =========================================================
 
 def usuario_logado():
@@ -145,45 +158,69 @@ def exigir_admin():
 
 
 # =========================================================
-# FUNÇÕES DE SEGURANÇA DE ARQUIVOS
+# SEGURANÇA DE ARQUIVOS
 # =========================================================
 
 def arquivo_e_py(nome):
-
     return nome.lower().endswith(".py")
 
 
 def app_py_protegido(nome):
-
     return os.path.basename(nome).lower() == "app.py"
 
 
 def caminho_seguro(nome):
+    """
+    Converte um nome relativo para caminho absoluto
+    dentro da pasta ARQUIVOS_DIR.
+
+    Impede:
+        ../
+        ../../
+        caminhos absolutos
+        acesso fora da pasta arquivos/
+    """
 
     if not nome:
         return None
 
-    nome = os.path.normpath(nome)
+    nome = str(nome).replace("\\", "/").strip()
 
-    if nome.startswith(".."):
+    if not nome:
         return None
 
-    if os.path.isabs(nome):
+    # Impede caminho absoluto Linux
+    if nome.startswith("/"):
+        return None
+
+    # Impede caminho absoluto Windows
+    if len(nome) >= 2 and nome[1] == ":":
         return None
 
     caminho = os.path.abspath(
-        os.path.join(ARQUIVOS_DIR, nome)
+        os.path.join(
+            ARQUIVOS_DIR,
+            nome
+        )
     )
 
     try:
 
+        pasta_real = os.path.realpath(
+            ARQUIVOS_DIR
+        )
+
+        caminho_real = os.path.realpath(
+            caminho
+        )
+
         if os.path.commonpath(
-            [ARQUIVOS_DIR, caminho]
-        ) != ARQUIVOS_DIR:
+            [pasta_real, caminho_real]
+        ) != pasta_real:
 
             return None
 
-    except ValueError:
+    except (ValueError, OSError):
 
         return None
 
@@ -193,13 +230,14 @@ def caminho_seguro(nome):
 def nome_arquivo_seguro(nome):
     """
     Retorna somente o nome do arquivo.
-    Impede caminhos como ../../app.py.
     """
 
     if not nome:
         return None
 
-    nome = os.path.basename(nome).strip()
+    nome = os.path.basename(
+        nome
+    ).strip()
 
     if not nome:
         return None
@@ -218,20 +256,29 @@ def nome_arquivo_seguro(nome):
 def index():
 
     if usuario_logado():
-        return redirect(url_for("dashboard"))
+        return redirect(
+            url_for("dashboard")
+        )
 
-    return redirect(url_for("login"))
+    return redirect(
+        url_for("login")
+    )
 
 
 # =========================================================
 # LOGIN
 # =========================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if usuario_logado():
-        return redirect(url_for("dashboard"))
+        return redirect(
+            url_for("dashboard")
+        )
 
     if request.method == "POST":
 
@@ -245,9 +292,7 @@ def login():
             ""
         )
 
-        # ---------------------------------------------
-        # VERIFICAR ADMINISTRADOR
-        # ---------------------------------------------
+        # ADMIN
 
         admin_usuario_correto = hmac.compare_digest(
             usuario,
@@ -274,9 +319,7 @@ def login():
                 url_for("dashboard")
             )
 
-        # ---------------------------------------------
-        # VERIFICAR USUÁRIO NORMAL
-        # ---------------------------------------------
+        # USUÁRIO NORMAL
 
         usuario_correto = hmac.compare_digest(
             usuario,
@@ -303,16 +346,14 @@ def login():
                 url_for("dashboard")
             )
 
-        # ---------------------------------------------
-        # LOGIN INCORRETO
-        # ---------------------------------------------
-
         flash(
             "Usuário ou senha incorretos.",
             "erro"
         )
 
-    return render_template("login.html")
+    return render_template(
+        "login.html"
+    )
 
 
 # =========================================================
@@ -323,7 +364,9 @@ def login():
 def dashboard():
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+        return redirect(
+            url_for("login")
+        )
 
     return render_template(
         "dashboard.html",
@@ -333,7 +376,7 @@ def dashboard():
 
 
 # =========================================================
-# PAINEL DE ADMINISTRADOR
+# ADMIN
 # =========================================================
 
 @app.route("/admin")
@@ -347,7 +390,6 @@ def admin():
     total_arquivos = 0
     total_python = 0
 
-    # Garante que a pasta exista
     os.makedirs(
         ARQUIVOS_DIR,
         exist_ok=True
@@ -373,7 +415,7 @@ def admin():
 
 
 # =========================================================
-# PAINEL ADMINISTRATIVO DE RESERVA
+# ADMIN INFO
 # =========================================================
 
 @app.route("/admin-info")
@@ -408,112 +450,112 @@ def admin_info():
 <html lang="pt">
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
-    <title>Painel de Administrador</title>
+<title>Painel de Administrador</title>
 
-    <style>
+<style>
 
-        body {{
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f2f4f7;
-        }}
+body {{
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f2f4f7;
+}}
 
-        header {{
-            background: #1f2937;
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }}
+header {{
+    background: #1f2937;
+    color: white;
+    padding: 25px;
+    text-align: center;
+}}
 
-        .container {{
-            max-width: 900px;
-            margin: 30px auto;
-            padding: 20px;
-        }}
+.container {{
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 20px;
+}}
 
-        .cards {{
-            display: grid;
-            grid-template-columns:
-                repeat(auto-fit, minmax(220px, 1fr));
-            gap: 20px;
-        }}
+.cards {{
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}}
 
-        .card {{
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,.1);
-        }}
+.card {{
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}}
 
-        .numero {{
-            font-size: 40px;
-            font-weight: bold;
-            color: #2563eb;
-        }}
+.numero {{
+    font-size: 40px;
+    font-weight: bold;
+    color: #2563eb;
+}}
 
-        a {{
-            display: inline-block;
-            margin-top: 25px;
-            background: #2563eb;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 6px;
-            text-decoration: none;
-        }}
+a {{
+    display: inline-block;
+    margin-top: 25px;
+    background: #2563eb;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+}}
 
-    </style>
+</style>
 
 </head>
 
 <body>
 
-    <header>
+<header>
 
-        <h1>⚙️ Painel de Administrador</h1>
+<h1>⚙️ Painel de Administrador</h1>
 
-        <p>👑 {session.get("usuario")}</p>
+<p>👑 {session.get("usuario")}</p>
 
-    </header>
+</header>
 
-    <div class="container">
+<div class="container">
 
-        <div class="cards">
+<div class="cards">
 
-            <div class="card">
+<div class="card">
 
-                <h2>📁 Ficheiros</h2>
+<h2>📁 Ficheiros</h2>
 
-                <div class="numero">
-                    {total_arquivos}
-                </div>
+<div class="numero">
+{total_arquivos}
+</div>
 
-            </div>
+</div>
 
-            <div class="card">
+<div class="card">
 
-                <h2>🐍 Python</h2>
+<h2>🐍 Python</h2>
 
-                <div class="numero">
-                    {total_python}
-                </div>
+<div class="numero">
+{total_python}
+</div>
 
-            </div>
+</div>
 
-        </div>
+</div>
 
-        <a href="{url_for('dashboard')}">
-            ← Voltar ao Dashboard
-        </a>
+<a href="{url_for('dashboard')}">
+← Voltar ao Dashboard
+</a>
 
-    </div>
+</div>
 
 </body>
 </html>
@@ -533,7 +575,9 @@ def admin_info():
 def dados_usuario():
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+        return redirect(
+            url_for("login")
+        )
 
     if request.method == "POST":
 
@@ -559,9 +603,10 @@ def dados_usuario():
 def arquivos():
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+        return redirect(
+            url_for("login")
+        )
 
-    # Garante que a pasta exista
     os.makedirs(
         ARQUIVOS_DIR,
         exist_ok=True
@@ -587,14 +632,14 @@ def arquivos():
                     ARQUIVOS_DIR
                 )
 
-                # Normaliza para funcionar corretamente
-                # também em links HTML.
                 relativo = relativo.replace(
                     os.sep,
                     "/"
                 )
 
-                lista.append(relativo)
+                lista.append(
+                    relativo
+                )
 
     except OSError as e:
 
@@ -617,23 +662,154 @@ def arquivos():
 
 
 # =========================================================
-# VISUALIZAR ARQUIVO
+# VISUALIZAR / ABRIR ARQUIVO
 # =========================================================
 
-# IMPORTANTE:
-# Aqui estava um dos erros do seu código.
-#
-# ERRADO:
-# /visualizar/path\:nome
-#
-# CORRETO:
-# /visualizar/<path:nome>
-
-@app.route("/visualizar/<path:nome>")
+@app.route(
+    "/visualizar/<path:nome>"
+)
 def visualizar(nome):
 
     if not usuario_logado():
-        return redirect(url_for("login"))
+        return redirect(
+            url_for("login")
+        )
+
+    # -----------------------------------------------------
+    # VALIDAR CAMINHO
+    # -----------------------------------------------------
+
+    caminho = caminho_seguro(nome)
+
+    if caminho is None:
+
+        abort(404)
+
+    # -----------------------------------------------------
+    # VERIFICAR SE EXISTE
+    # -----------------------------------------------------
+
+    if not os.path.exists(caminho):
+
+        flash(
+            "Ficheiro não encontrado.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    # -----------------------------------------------------
+    # NÃO PERMITIR ABRIR DIRETÓRIO
+    # -----------------------------------------------------
+
+    if not os.path.isfile(caminho):
+
+        flash(
+            "O caminho informado não é um ficheiro.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+    # -----------------------------------------------------
+    # ARQUIVOS PYTHON
+    # -----------------------------------------------------
+
+    if arquivo_e_py(nome):
+
+        try:
+
+            with open(
+                caminho,
+                "r",
+                encoding="utf-8"
+            ) as f:
+
+                conteudo = f.read()
+
+        except UnicodeDecodeError:
+
+            flash(
+                "Não foi possível ler o ficheiro Python.",
+                "erro"
+            )
+
+            return redirect(
+                url_for("arquivos")
+            )
+
+        except OSError as e:
+
+            flash(
+                f"Erro ao ler o ficheiro: {e}",
+                "erro"
+            )
+
+            return redirect(
+                url_for("arquivos")
+            )
+
+        return render_template(
+            "editor.html",
+            nome=nome,
+            conteudo=conteudo,
+            admin=usuario_admin(),
+            somente_visualizacao=not usuario_admin(),
+        )
+
+    # -----------------------------------------------------
+    # OUTROS ARQUIVOS
+    # -----------------------------------------------------
+
+    tipo_mime, _ = mimetypes.guess_type(
+        caminho
+    )
+
+    if not tipo_mime:
+        tipo_mime = "application/octet-stream"
+
+    # -----------------------------------------------------
+    # ENVIAR ARQUIVO DIRETAMENTE
+    # -----------------------------------------------------
+
+    try:
+
+        return send_file(
+            caminho,
+            mimetype=tipo_mime,
+            as_attachment=False,
+            conditional=True
+        )
+
+    except OSError:
+
+        flash(
+            "Não foi possível abrir o ficheiro.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("arquivos")
+        )
+
+
+# =========================================================
+# DOWNLOAD FORÇADO
+# =========================================================
+
+@app.route(
+    "/download/<path:nome>"
+)
+def download(nome):
+
+    if not usuario_logado():
+        return redirect(
+            url_for("login")
+        )
 
     caminho = caminho_seguro(nome)
 
@@ -651,61 +827,34 @@ def visualizar(nome):
             url_for("arquivos")
         )
 
-    # ---------------------------------------------
-    # ARQUIVOS PYTHON
-    # ---------------------------------------------
+    nome_download = os.path.basename(
+        caminho
+    )
 
-    if arquivo_e_py(nome):
+    try:
 
-        try:
-
-            with open(
-                caminho,
-                "r",
-                encoding="utf-8"
-            ) as f:
-
-                conteudo = f.read()
-
-        except (
-            UnicodeDecodeError,
-            OSError
-        ):
-
-            flash(
-                "Não foi possível ler este ficheiro.",
-                "erro"
-            )
-
-            return redirect(
-                url_for("arquivos")
-            )
-
-        return render_template(
-            "editor.html",
-            nome=nome,
-            conteudo=conteudo,
-            admin=usuario_admin(),
-            somente_visualizacao=not usuario_admin(),
+        return send_file(
+            caminho,
+            as_attachment=True,
+            download_name=nome_download,
+            conditional=True
         )
 
-    # ---------------------------------------------
-    # OUTROS ARQUIVOS
-    # ---------------------------------------------
+    except OSError:
 
-    diretorio = os.path.dirname(caminho)
+        flash(
+            "Não foi possível fazer o download.",
+            "erro"
+        )
 
-    nome_arquivo = os.path.basename(caminho)
-
-    return send_from_directory(
-        diretorio,
-        nome_arquivo
-    )
+        return redirect(
+            url_for("arquivos")
+        )
 
 
 # =========================================================
-# EDITAR ARQUIVO PY
-# SOMENTE ADMINISTRADOR
+# EDITAR PY
+# SOMENTE ADMIN
 # =========================================================
 
 @app.route(
@@ -730,7 +879,6 @@ def editar(nome):
             url_for("arquivos")
         )
 
-    # app.py nunca pode ser editado.
     if app_py_protegido(nome):
 
         flash(
@@ -798,7 +946,7 @@ def editar(nome):
 
 # =========================================================
 # CRIAR ARQUIVO PY
-# SOMENTE ADMINISTRADOR
+# SOMENTE ADMIN
 # =========================================================
 
 @app.route(
@@ -916,8 +1064,8 @@ def novo_arquivo():
 
 
 # =========================================================
-# UPLOAD DE ARQUIVO PY
-# SOMENTE ADMINISTRADOR
+# UPLOAD
+# SOMENTE ADMIN
 # =========================================================
 
 @app.route(
@@ -976,7 +1124,8 @@ def upload():
                 url_for("upload")
             )
 
-        # Somente Python
+        # SOMENTE PYTHON
+
         if not nome.lower().endswith(".py"):
 
             flash(
@@ -988,7 +1137,8 @@ def upload():
                 url_for("upload")
             )
 
-        # app.py protegido
+        # PROTEGER APP.PY
+
         if app_py_protegido(nome):
 
             flash(
@@ -1013,7 +1163,6 @@ def upload():
                 url_for("upload")
             )
 
-        # Não substituir arquivos existentes.
         if os.path.exists(caminho):
 
             flash(
@@ -1033,7 +1182,9 @@ def upload():
                 exist_ok=True
             )
 
-            ficheiro.save(caminho)
+            ficheiro.save(
+                caminho
+            )
 
             flash(
                 "Ficheiro enviado com sucesso.",
@@ -1053,8 +1204,8 @@ def upload():
 
 
 # =========================================================
-# EXCLUIR ARQUIVO PY
-# SOMENTE ADMINISTRADOR
+# EXCLUIR PY
+# SOMENTE ADMIN
 # =========================================================
 
 @app.route(
@@ -1079,7 +1230,6 @@ def excluir(nome):
             url_for("arquivos")
         )
 
-    # app.py nunca pode ser excluído.
     if app_py_protegido(nome):
 
         flash(
@@ -1143,7 +1293,7 @@ def logout():
 
 
 # =========================================================
-# ERRO DE UPLOAD MUITO GRANDE
+# ERRO 413
 # =========================================================
 
 @app.errorhandler(413)
@@ -1156,6 +1306,7 @@ def arquivo_muito_grande(error):
     )
 
     if usuario_logado():
+
         return redirect(
             url_for("upload")
         )
@@ -1189,7 +1340,34 @@ def pagina_nao_encontrada(error):
 
 
 # =========================================================
-# EXECUTAR APLICAÇÃO
+# ERRO 500
+# =========================================================
+
+@app.errorhandler(500)
+def erro_interno(error):
+
+    app.logger.exception(
+        "Erro interno do servidor"
+    )
+
+    if usuario_logado():
+
+        flash(
+            "Ocorreu um erro interno ao processar o pedido.",
+            "erro"
+        )
+
+        return redirect(
+            url_for("dashboard")
+        )
+
+    return redirect(
+        url_for("login")
+    )
+
+
+# =========================================================
+# EXECUTAR
 # =========================================================
 
 if __name__ == "__main__":
@@ -1206,3 +1384,4 @@ if __name__ == "__main__":
         port=port,
         debug=False
     )
+
