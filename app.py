@@ -27,7 +27,7 @@ def login():
         usuario = request.form.get("usuario")
         senha = request.form.get("senha")
 
-        if usuario == "admin" and senha == "1234":
+        if usuario == "tech" and senha == "emildaemilda#1":
 
             session["usuario"] = usuario
 
