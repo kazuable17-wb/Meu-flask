@@ -19,10 +19,31 @@ from flask import (
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get(
-    "SECRET_KEY",
-    ""
+# =========================================================
+# SEGURANÇA DA SESSÃO
+# =========================================================
+# A SECRET_KEY DEVE existir nas Environment Variables do Render.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY não configurada. "
+        "Adicione SECRET_KEY nas Environment Variables do Render."
+    )
+
+app.config["SECRET_KEY"] = SECRET_KEY
+
+# Proteções dos cookies da sessão.
+# COOKIE_SECURE=true no Render (HTTPS).
+# Para desenvolvimento local em HTTP, use COOKIE_SECURE=false.
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = (
+    os.environ.get("COOKIE_SECURE", "true").lower() == "true"
 )
+
+# Limite de upload para evitar ficheiros gigantes.
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 
 # =========================================================
@@ -38,6 +59,12 @@ ADMIN_SENHA = os.environ.get(
     "ADMIN_SENHA",
     ""
 )
+
+if not ADMIN_USUARIO or not ADMIN_SENHA:
+    raise RuntimeError(
+        "ADMIN_USUARIO e ADMIN_SENHA devem ser configurados "
+        "nas Environment Variables do Render."
+    )
 
 
 # =========================================================
@@ -57,6 +84,41 @@ os.makedirs(
     ARQUIVOS_DIR,
     exist_ok=True
 )
+
+
+# =========================================================
+# CABEÇALHOS DE SEGURANÇA
+# =========================================================
+
+@app.after_request
+def adicionar_cabecalhos_seguranca(response):
+    # Impede o navegador de interpretar tipos de ficheiro de forma diferente.
+    response.headers["X-Content-Type-Options"] = "nosniff"
+
+    # Reduz o risco de ataques de clickjacking.
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+
+    # Controla informação enviada no cabeçalho Referer.
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # Desativa funcionalidades do navegador que a aplicação não necessita.
+    response.headers["Permissions-Policy"] = (
+        "camera=(), microphone=(), geolocation=()"
+    )
+
+    # CSP moderada para não quebrar os templates existentes que possam
+    # utilizar CSS/JS inline. Pode ser endurecida depois de rever os templates.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "script-src 'self' 'unsafe-inline' https:; "
+        "font-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'self';"
+    )
+
+    return response
 
 
 # =========================================================
