@@ -24,17 +24,19 @@ def login():
 
     if request.method == "POST":
 
-    usuario = request.form.get("usuario")
-    senha = request.form.get("senha")
+        usuario = request.form.get("usuario")
+        senha = request.form.get("senha")
 
-    if usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
-        session["usuario"] = usuario
-        return redirect(url_for("dashboard"))
+        if usuario == ADMIN_USUARIO and senha == ADMIN_SENHA:
 
-    return render_template(
-        "login.html",
-        erro="Usuário ou senha incorretos."
-    )
+            session["usuario"] = usuario
+
+            return redirect(url_for("dashboard"))
+
+        return render_template(
+            "login.html",
+            erro="Usuário ou senha inválidos."
+        )
 
     return render_template("login.html")
 # =========================
